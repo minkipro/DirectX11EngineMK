@@ -115,7 +115,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, const XMMATRIX& tran
 	for (UINT i = 0; i < mesh->mNumBones; i++)
 	{
 		aiBone* bone = mesh->mBones[i];
-		XMMATRIX offsetMatrix = XMMATRIX(&bone->mOffsetMatrix.a1);
+		XMMATRIX offsetMatrix = XMMatrixTranspose(XMMATRIX(&bone->mOffsetMatrix.a1));
 		//XMMATRIX offsetMatrix = XMMATRIX(&bone->mOffsetMatrix.a1)*openGlToDirectX;
 		boneInfo[bone->mName.C_Str()] = { i, offsetMatrix };
 
@@ -449,8 +449,7 @@ void Model::getPose(Animation& animation, Bone& skeletion, float dt, std::vector
 		fp = getTimeFraction(btt.rotationTimestamps, newdt);
 		aiQuaternion rotation1 = btt.rotations[fp.first - 1].Normalize();
 		aiQuaternion rotation2 = btt.rotations[fp.first].Normalize();
-
-		rotation = this->Lerp(rotation1, rotation2, fp.second);
+		aiQuaternion::Interpolate(rotation, rotation1, rotation2, fp.second);
 	}
 	else if (btt.positionTimestamps.size() == 1)
 	{
@@ -473,14 +472,19 @@ void Model::getPose(Animation& animation, Bone& skeletion, float dt, std::vector
 	XMMATRIX positionMat = XMMatrixIdentity(),
 		scaleMat = XMMatrixIdentity();
 	// calculate localTransform
-	aiMatrix4x4 ailocalTransform = aiMatrix4x4(scale, rotation, position);
-	XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1);
-	//XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1)*openGlToDirectX;
-	XMMATRIX globalTransform =  parentTransform* localTransform;
+	XMVECTOR rotationQuater = {rotation.x, rotation.y, rotation.z, rotation.w};
+	XMMATRIX rotationMatrix = XMMatrixRotationQuaternion(rotationQuater);
 
+
+	positionMat = XMMatrixTranslation(position.x, position.y, position.z);
+	scaleMat = XMMatrixScaling(scale.x, scale.y, scale.z);
+	XMMATRIX localTransform = scaleMat * rotationMatrix * positionMat;
+	aiMatrix4x4 ailocalTransform = aiMatrix4x4(scale, rotation, position);
+	//XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1);
+	XMMATRIX globalTransform = localTransform * parentTransform;
 	if (animation.boneTransforms.find(skeletion.name) != animation.boneTransforms.end())
 	{
-		output[skeletion.id] = skeletion.offset*globalTransform;
+		output[skeletion.id] = (skeletion.offset * globalTransform)*globalInverseTransform;
 	}
 	
 	//output[skeletion.id] = localTransform;
@@ -497,21 +501,6 @@ aiVector3D Model::Lerp(aiVector3D value1, aiVector3D value2, float amount)
 		int a = 1;
 	}
 	return value1 + ((value2 - value1) * amount);
-}
-
-aiQuaternion Model::Lerp(aiQuaternion value1, aiQuaternion value2, float amount)
-{
-	if (amount < 0.0f || amount>1.0f)
-	{
-		int a = 1;
-	}
-	aiQuaternion r;
-	r.x = (1 - amount) * value1.x + amount * value2.x;
-	r.y = (1 - amount) * value1.y + amount * value2.y;
-	r.z = (1 - amount) * value1.z + amount * value2.z;
-	r.w = (1 - amount) * value1.w + amount * value2.w;
-	r.Normalize();
-	return r;
 }
 
 //XMMATRIX Model::assimpToXMMATRIX(aiMatrix4x4& mat)

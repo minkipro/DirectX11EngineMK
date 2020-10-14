@@ -40,7 +40,7 @@ VS_OUTPUT main(VS_INPUT input)
     boneTransform += mul(bone_transforms[(int) (input.inBoneIdB.z)], input.inBoneWeightsB.z);
     boneTransform += mul(bone_transforms[(int) (input.inBoneIdB.w)], input.inBoneWeightsB.w);
     
-    float4 pos = mul(boneTransform, float4(input.inPos, 1.0f));
+    float4 pos = mul(float4(input.inPos, 1.0f), boneTransform);
     
     //output.outPosition = mul(pos, wvpMatrix);
     output.outPosition = mul(pos, wvpMatrix);

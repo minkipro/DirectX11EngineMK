@@ -51,7 +51,6 @@ private:
 	std::pair<UINT, float> getTimeFraction(std::vector<float>& times, float& dt);
 	void getPose(Animation& animation, Bone& skeletion, float dt, std::vector<XMMATRIX>& output, XMMATRIX& parentTransform, XMMATRIX& globalInverseTransform);
 	aiVector3D Lerp(aiVector3D value1, aiVector3D value2, float amount);
-	aiQuaternion Lerp(aiQuaternion value1, aiQuaternion value2, float amount);
 
 private:
 	std::vector<Mesh>					_meshes;
