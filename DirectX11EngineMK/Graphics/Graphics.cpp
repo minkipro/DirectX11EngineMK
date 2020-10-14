@@ -327,6 +327,11 @@ bool Graphics::InitializeScene()
 		{
 			return false;
 		}
+
+		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\Spider.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
+		{
+			return false;
+		}*/
 		
 
 		if (!_sprite.Initialize(_device.Get(), _deviceContext.Get(), 256, 256, "Data/Textures/circle.png", _cb_vs_vertexshader_2d))

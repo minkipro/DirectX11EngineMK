@@ -28,6 +28,8 @@ bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11
 void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix)
 {
 	XMMATRIX parentTransform = XMMatrixIdentity();
+	_test.clear();
+	_test2.clear();
 	getPose(_animation[0], _skeletons, _timer.GetMilisecondsElapsed(), _currentPose, parentTransform, _globalInverseTransform);
 	_deviceContext->VSSetConstantBuffers(0, 1, _cb_vs_vertexshader_skeleton->GetAddressOf());
 	for (int i = 0; i < _meshes.size(); i++)
@@ -35,11 +37,11 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 		//Update Constant buffer with WVP Matrix
 		_cb_vs_vertexshader_skeleton->_data.worldMatrix = _meshes[i].GetTransformMatirx() * worldMatrix;
 		_cb_vs_vertexshader_skeleton->_data.wvpMatrix = _cb_vs_vertexshader_skeleton->_data.worldMatrix * viewProjectionMatrix; //Calculate World-View-Projection Matrix
+		
 		for (size_t i = 0; i < _currentPose.size(); i++)
 		{
 			_cb_vs_vertexshader_skeleton->_data.boneTransform[i] = _currentPose[i];
 		}
-
 		_cb_vs_vertexshader_skeleton->ApplyChanges();
 		_meshes[i].Draw();
 	}
@@ -413,83 +415,88 @@ std::pair<UINT, float> Model::getTimeFraction(std::vector<float>& times, float& 
 	return { segment, frac };
 }
 
-void Model::getPose(Animation& animation, Bone& skeletion, float dt, std::vector<XMMATRIX>& output, XMMATRIX& parentTransform, XMMATRIX& globalInverseTransform)
+void Model::getPose(Animation& animation, Bone& skeleton, float dt, std::vector<XMMATRIX>& output, XMMATRIX& parentTransform, XMMATRIX& globalInverseTransform)
 {
-	BoneTransformTrack& btt = animation.boneTransforms[skeletion.name];
-
-	dt = fmod(dt, animation.duration);
-
-	float newdt = dt / animation.duration * (btt.positionTimestamps.size() - 1);
-	if (newdt > 10.0f)
+	XMMATRIX globalTransform = parentTransform;
+	if (!skeleton.name.empty())
 	{
-		int a = 1;
-	}
-	std::pair<UINT, float> fp;
+		BoneTransformTrack& btt = animation.boneTransforms[skeleton.name];
 
-	aiVector3D position = aiVector3D(0.0f, 0.0f, 0.0f);
-	aiQuaternion rotation = aiQuaternion(0.0f, 0.0f, 0.0f, 0.0f);
-	aiVector3D scale = aiVector3D(1.0f, 1.0f, 1.0f);
-	//calculate interpolated position
-	if (btt.positionTimestamps.size() > 1)
-	{
-		fp = getTimeFraction(btt.positionTimestamps, newdt);
+		dt = fmod(dt, animation.duration);
 
-		aiVector3D position1 = btt.positions[fp.first - 1];
-		aiVector3D position2 = btt.positions[fp.first];
-		position = this->Lerp(position1, position2, fp.second);
-	}
-	else if (btt.positionTimestamps.size() == 1)
-	{
-		position = btt.positions[0];
-	}
-	//calculate interpolated rotation
+		float newdt = dt / animation.duration * (btt.positionTimestamps.size() - 1);
+		if (newdt > 10.0f)
+		{
+			int a = 1;
+		}
+		std::pair<UINT, float> fp;
 
-	if (btt.positionTimestamps.size() > 1)
-	{
-		fp = getTimeFraction(btt.rotationTimestamps, newdt);
-		aiQuaternion rotation1 = btt.rotations[fp.first - 1].Normalize();
-		aiQuaternion rotation2 = btt.rotations[fp.first].Normalize();
-		aiQuaternion::Interpolate(rotation, rotation1, rotation2, fp.second);
-	}
-	else if (btt.positionTimestamps.size() == 1)
-	{
-		rotation = btt.rotations[0];
-	}
+		aiVector3D position = aiVector3D(0.0f, 0.0f, 0.0f);
+		aiQuaternion rotation = aiQuaternion(0.0f, 0.0f, 0.0f, 0.0f);
+		aiVector3D scale = aiVector3D(1.0f, 1.0f, 1.0f);
+		//calculate interpolated position
+		if (btt.positionTimestamps.size() > 1)
+		{
+			fp = getTimeFraction(btt.positionTimestamps, newdt);
 
-	//calculate interpolated scale
-	if (btt.positionTimestamps.size() > 1)
-	{
-		fp = getTimeFraction(btt.scaleTimestamps, newdt);
-		aiVector3D scale1 = btt.scales[fp.first - 1];
-		aiVector3D scale2 = btt.scales[fp.first];
+			aiVector3D position1 = btt.positions[fp.first - 1];
+			aiVector3D position2 = btt.positions[fp.first];
+			position = this->Lerp(position1, position2, fp.second);
+		}
+		else if (btt.positionTimestamps.size() == 1)
+		{
+			position = btt.positions[0];
+		}
+		//calculate interpolated rotation
 
-		scale = this->Lerp(scale1, scale2, fp.second);
-	}
-	else if (btt.positionTimestamps.size() == 1)
-	{
-		scale = btt.scales[0];
-	}
-	XMMATRIX positionMat = XMMatrixIdentity(),
-		scaleMat = XMMatrixIdentity();
-	// calculate localTransform
-	XMVECTOR rotationQuater = {rotation.x, rotation.y, rotation.z, rotation.w};
-	XMMATRIX rotationMatrix = XMMatrixRotationQuaternion(rotationQuater);
+		if (btt.positionTimestamps.size() > 1)
+		{
+			fp = getTimeFraction(btt.rotationTimestamps, newdt);
+			aiQuaternion rotation1 = btt.rotations[fp.first - 1].Normalize();
+			aiQuaternion rotation2 = btt.rotations[fp.first].Normalize();
+			aiQuaternion::Interpolate(rotation, rotation1, rotation2, fp.second);
+		}
+		else if (btt.positionTimestamps.size() == 1)
+		{
+			rotation = btt.rotations[0];
+		}
+
+		//calculate interpolated scale
+		if (btt.positionTimestamps.size() > 1)
+		{
+			fp = getTimeFraction(btt.scaleTimestamps, newdt);
+			aiVector3D scale1 = btt.scales[fp.first - 1];
+			aiVector3D scale2 = btt.scales[fp.first];
+
+			scale = this->Lerp(scale1, scale2, fp.second);
+		}
+		else if (btt.positionTimestamps.size() == 1)
+		{
+			scale = btt.scales[0];
+		}
+		XMMATRIX positionMat = XMMatrixIdentity(),
+			scaleMat = XMMatrixIdentity();
+		// calculate localTransform
+		XMVECTOR rotationQuater = { rotation.x, rotation.y, rotation.z, rotation.w };
+		XMMATRIX rotationMatrix = XMMatrixRotationQuaternion(rotationQuater);
 
 
-	positionMat = XMMatrixTranslation(position.x, position.y, position.z);
-	scaleMat = XMMatrixScaling(scale.x, scale.y, scale.z);
-	XMMATRIX localTransform = scaleMat * rotationMatrix * positionMat;
-	aiMatrix4x4 ailocalTransform = aiMatrix4x4(scale, rotation, position);
-	//XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1);
-	XMMATRIX globalTransform = localTransform * parentTransform;
-	if (animation.boneTransforms.find(skeletion.name) != animation.boneTransforms.end())
-	{
-		output[skeletion.id] = (skeletion.offset * globalTransform)*globalInverseTransform;
+		positionMat = XMMatrixTranslation(position.x, position.y, position.z);
+		scaleMat = XMMatrixScaling(scale.x, scale.y, scale.z);
+		XMMATRIX localTransform = scaleMat * rotationMatrix * positionMat;
+		aiMatrix4x4 ailocalTransform = aiMatrix4x4(scale, rotation, position);
+		//XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1);
+		globalTransform = localTransform * globalTransform;
+
+		output[skeleton.id] = (skeleton.offset * globalTransform) * globalInverseTransform;
+		_test.push_back(skeleton.id);
+		_test2.push_back(skeleton.name);
 	}
+	
 	
 	//output[skeletion.id] = localTransform;
 	//update values for children bones
-	for (Bone& child : skeletion.children) {
+	for (Bone& child : skeleton.children) {
 		getPose(animation, child, dt, output, globalTransform, globalInverseTransform);
 	}
 }

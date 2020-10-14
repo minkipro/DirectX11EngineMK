@@ -66,4 +66,7 @@ private:
 	Timer _timer;
 	std::vector<XMMATRIX> _currentPose = {};
 	vector<UINT> _boneCount;
+
+	vector<UINT> _test;
+	vector<string> _test2;
 };
