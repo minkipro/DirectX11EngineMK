@@ -1,6 +1,78 @@
 #include "Model.h"
 
+unsigned int FindKeyIndex(const float animationTime, const int numKeys, const aiVectorKey* const vectorKey)
+{
+	assert(numKeys > 0);
+	for (int i = 0; i < numKeys - 1; i++)
+		if (animationTime < (float)vectorKey[i + 1].mTime)
+			return i;
+	assert(0);
+}
 
+unsigned int FindKeyIndex(const float animationTime, const int numKeys, const aiQuatKey* const quatKey)
+{
+	assert(numKeys > 0);
+	for (int i = 0; i < numKeys - 1; i++)
+		if (animationTime < (float)quatKey[i + 1].mTime)
+			return i;
+	assert(0);
+}
+
+aiVector3D CalcInterpolatedValueFromKey(float animationTime, const int numKeys, const aiVectorKey* const vectorKey)
+{
+	aiVector3D ret;
+	if (numKeys == 1)
+	{
+		ret = vectorKey[0].mValue;
+		return ret;
+	}
+
+	unsigned int keyIndex = FindKeyIndex(animationTime, numKeys, vectorKey);
+	unsigned int nextKeyIndex = keyIndex + 1;
+
+	assert(nextKeyIndex < numKeys);
+
+	float deltaTime = vectorKey[nextKeyIndex].mTime - vectorKey[keyIndex].mTime;
+	float factor = (animationTime - (float)vectorKey[keyIndex].mTime) / deltaTime;
+
+	assert(factor >= 0.0f && factor <= 1.0f);
+
+	const aiVector3D& startValue = vectorKey[keyIndex].mValue;
+	const aiVector3D& endValue = vectorKey[nextKeyIndex].mValue;
+
+	ret.x = startValue.x + (endValue.x - startValue.x) * factor;
+	ret.y = startValue.y + (endValue.y - startValue.y) * factor;
+	ret.z = startValue.z + (endValue.z - startValue.z) * factor;
+
+	return ret;
+}
+
+aiQuaternion CalcInterpolatedValueFromKey(float animationTime, const int numKeys, const aiQuatKey* const quatKey)
+{
+	aiQuaternion ret;
+	if (numKeys == 1)
+	{
+		ret = quatKey[0].mValue;
+		return ret;
+	}
+
+	unsigned int keyIndex = FindKeyIndex(animationTime, numKeys, quatKey);
+	unsigned int nextKeyIndex = keyIndex + 1;
+
+	assert(nextKeyIndex < numKeys);
+
+	float deltaTime = quatKey[nextKeyIndex].mTime - quatKey[keyIndex].mTime;
+	float factor = (animationTime - (float)quatKey[keyIndex].mTime) / deltaTime;
+
+	assert(factor >= 0.0f && factor <= 1.0f);
+
+	const aiQuaternion& startValue = quatKey[keyIndex].mValue;
+	const aiQuaternion& endValue = quatKey[nextKeyIndex].mValue;
+	aiQuaternion::Interpolate(ret, startValue, endValue, factor);
+	ret = ret.Normalize();
+
+	return ret;
+}
 bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11DeviceContext* deviceContext, ConstantBuffer<CB_VS_vertexshader_skeleton>& cb_vs_vertexshader_skeleton)
 {
 	_device = device;
@@ -21,16 +93,21 @@ bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11
 		ErrorLogger::Log(exception);
 		return false;
 	}
+
+	for (int i = 0; i < 100; i++)
+	{
+		_currentBone[i] = XMMatrixIdentity();
+	}
+
 	_timer.Start();
 	return true;
 }
 
 void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix)
 {
-	XMMATRIX parentTransform = XMMatrixIdentity();
-	_test.clear();
-	_test2.clear();
-	getPose(_animation[0], _skeletons, _timer.GetMilisecondsElapsed(), _currentPose, parentTransform, _globalInverseTransform);
+	float currentTime = (float)_timer.GetMilisecondsElapsed();
+	currentTime *= 0.05f;
+	SetAnimBoneTransform(currentTime, 0);
 	_deviceContext->VSSetConstantBuffers(0, 1, _cb_vs_vertexshader_skeleton->GetAddressOf());
 	for (int i = 0; i < _meshes.size(); i++)
 	{
@@ -38,9 +115,10 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 		_cb_vs_vertexshader_skeleton->_data.worldMatrix = _meshes[i].GetTransformMatirx() * worldMatrix;
 		_cb_vs_vertexshader_skeleton->_data.wvpMatrix = _cb_vs_vertexshader_skeleton->_data.worldMatrix * viewProjectionMatrix; //Calculate World-View-Projection Matrix
 		
-		for (size_t i = 0; i < _currentPose.size(); i++)
+		for (int i = 0; i < 100; i++)
 		{
-			_cb_vs_vertexshader_skeleton->_data.boneTransform[i] = _currentPose[i];
+			_cb_vs_vertexshader_skeleton->_data.boneTransform[i] = _currentBone[i];
+
 		}
 		_cb_vs_vertexshader_skeleton->ApplyChanges();
 		_meshes[i].Draw();
@@ -51,38 +129,36 @@ bool Model::LoadModel(const std::string& filePath)
 {
 
 	_directory = StringHelper::GetDirectoryFromPath(filePath);
-	Assimp::Importer importer;
+	
 
-	const aiScene* pScene = importer.ReadFile(filePath,
+	_pScene = _importer.ReadFile(filePath,
 		aiProcess_Triangulate |
 		aiProcess_ConvertToLeftHanded);
-	if (pScene == nullptr)
+	if (_pScene == nullptr)
 		return false;
 
-	_globalInverseTransform = XMMATRIX(&pScene->mRootNode->mTransformation.Inverse().a1);
+	_globalInverseTransform = XMMATRIX(&_pScene->mRootNode->mTransformation.Inverse().a1);
 
-	ProcessNode(pScene->mRootNode, pScene, DirectX::XMMatrixIdentity());
-	loadAnimation(pScene);
-	_currentPose.resize(_boneCount[0], XMMatrixIdentity());
+	ProcessNode(_pScene->mRootNode, DirectX::XMMatrixIdentity());
 
 	return true;
 }
 
-void Model::ProcessNode(aiNode* node, const aiScene* scene, const XMMATRIX& parentTransformMatrix)
+void Model::ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix)
 {
 	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)) * parentTransformMatrix;
 	for (UINT i = 0; i < node->mNumMeshes; i++)
 	{
-		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-		_meshes.push_back(ProcessMesh(mesh, scene, nodeTransformMatrix));
+		aiMesh* mesh = _pScene->mMeshes[node->mMeshes[i]];
+		_meshes.push_back(ProcessMesh(mesh, nodeTransformMatrix));
 	}
 	for (UINT i = 0; i < node->mNumChildren; i++)
 	{
-		ProcessNode(node->mChildren[i], scene, nodeTransformMatrix);
+		ProcessNode(node->mChildren[i], nodeTransformMatrix);
 	}
 }
 
-Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, const XMMATRIX& transformMatrix)
+Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 {
 	std::vector<Vertex3D_Skeleton> vertices;
 	std::vector<DWORD> indices;
@@ -109,9 +185,8 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, const XMMATRIX& tran
 		vertices.push_back(vertex);
 	}
 
-	std::unordered_map<std::string, std::pair<int, XMMATRIX>> boneInfo = {};
+	
 	std::vector<UINT> boneCounts;
-	_boneCount.push_back(mesh->mNumBones);
 	boneCounts.resize(vertices.size(), 0);
 
 	for (UINT i = 0; i < mesh->mNumBones; i++)
@@ -119,7 +194,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, const XMMATRIX& tran
 		aiBone* bone = mesh->mBones[i];
 		XMMATRIX offsetMatrix = XMMatrixTranspose(XMMATRIX(&bone->mOffsetMatrix.a1));
 		//XMMATRIX offsetMatrix = XMMATRIX(&bone->mOffsetMatrix.a1)*openGlToDirectX;
-		boneInfo[bone->mName.C_Str()] = { i, offsetMatrix };
+		_boneInfo[bone->mName.C_Str()] = { i, offsetMatrix };
 
 		for (UINT j = 0; j < bone->mNumWeights; j++)
 		{
@@ -205,13 +280,56 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, const XMMATRIX& tran
 	}
 
 	std::vector<Texture> textures;
-	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-	std::vector<Texture> diffuseTextures = LoadMaterialTextures(material, aiTextureType::aiTextureType_DIFFUSE, scene);
+	aiMaterial* material = _pScene->mMaterials[mesh->mMaterialIndex];
+	std::vector<Texture> diffuseTextures = LoadMaterialTextures(material, aiTextureType::aiTextureType_DIFFUSE, _pScene);
 	textures.insert(textures.end(), diffuseTextures.begin(), diffuseTextures.end());
 
-	readSkeleton(_skeletons, scene->mRootNode, boneInfo);
-
 	return Mesh(_device, _deviceContext, vertices, indices, textures, transformMatrix);
+}
+
+void Model::SetAnimBoneTransform(float animationTime, const int animationIndex)
+{
+	animationTime = fmod(animationTime, _pScene->mAnimations[animationIndex]->mDuration);
+	ProcessNodeAnim(animationTime, _pScene->mRootNode, XMMatrixIdentity(), 0);
+}
+
+void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& parentTransform, int meshIndex)
+{
+	string nodeName = node->mName.data;
+	const aiAnimation* animation = _pScene->mAnimations[0];
+
+	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
+
+	const aiNodeAnim* nodeAnim = FindNodeAnim(animation, nodeName);
+	if (nodeAnim)
+	{
+		const aiVector3D& scaling = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumScalingKeys, nodeAnim->mScalingKeys);
+		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
+
+		const aiQuaternion& rotationQ = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumRotationKeys, nodeAnim->mRotationKeys);
+		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
+
+		const aiVector3D& translation = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumPositionKeys, nodeAnim->mPositionKeys);
+		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
+
+		nodeTransformMatrix = scalingM * rotationM * translationM;
+	}
+
+	XMMATRIX globalTransform = nodeTransformMatrix * parentTransform;
+	if (_boneInfo.find(nodeName) != _boneInfo.end())
+	{
+		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform * XMMatrixTranspose(XMMATRIX(&_pScene->mRootNode->mTransformation.a1));
+		_currentBone[_boneInfo[nodeName].first] = finalTransform;
+	}
+	else
+	{
+		meshIndex += node->mNumMeshes;
+	}
+	
+	for (UINT i = 0; i < node->mNumChildren; i++)
+	{
+		ProcessNodeAnim(animationTime, node->mChildren[i], globalTransform, meshIndex);
+	}
 }
 
 TextureStorageType Model::DetermineTextureStorageType(const aiScene* pScene, aiMaterial* pMat, unsigned int index, aiTextureType textureType)
@@ -332,195 +450,10 @@ int Model::GetTextureIndex(aiString* pStr)
 	return atoi(&pStr->C_Str()[1]);
 }
 
-bool Model::readSkeleton(Bone& boneOutput, aiNode* node, std::unordered_map<std::string, std::pair<int, XMMATRIX>>& boneInfoTable)
+aiNodeAnim* Model::FindNodeAnim(const aiAnimation* animation, const string nodeName)
 {
-	if (boneInfoTable.find(node->mName.C_Str()) != boneInfoTable.end())
-	{
-		boneOutput.name = node->mName.C_Str();
-		boneOutput.id = boneInfoTable[boneOutput.name].first;
-		boneOutput.offset = boneInfoTable[boneOutput.name].second;
-
-		for (UINT i = 0; i < node->mNumChildren; i++)
-		{
-			Bone child;
-			readSkeleton(child, node->mChildren[i], boneInfoTable);
-			boneOutput.children.push_back(child);
-		}
-		return true;
-	}
-	else
-	{
-		for (int i = 0; i < node->mNumChildren; i++)
-		{
-			if (readSkeleton(boneOutput, node->mChildren[i], boneInfoTable))
-			{
-				return true;
-			}
-		}
-	}
-	return false;
+	 for (int i = 0; i < animation->mNumChannels; i++)
+        if (animation->mChannels[i]->mNodeName.data == nodeName)
+            return animation->mChannels[i];
+    return nullptr;
 }
-
-void Model::loadAnimation(const aiScene* scene)
-{
-	for (UINT k = 0; k < scene->mNumAnimations; k++)
-	{
-		_animation.push_back(Animation());
-		Animation& animation = _animation.back();
-		aiAnimation* anim = scene->mAnimations[k];
-
-		if (anim->mTicksPerSecond != 0.0f)
-			animation.ticksPerSecond = anim->mTicksPerSecond;
-		else
-			animation.ticksPerSecond = 1;
-
-
-		animation.duration = anim->mDuration * anim->mTicksPerSecond;
-		animation.boneTransforms = {};
-
-		//load positions rotations and scales for each bone
-		// each channel represents each bone
-		for (int i = 0; i < anim->mNumChannels; i++) {
-			aiNodeAnim* channel = anim->mChannels[i];
-			BoneTransformTrack track;
-			for (int j = 0; j < channel->mNumPositionKeys; j++) {
-				track.positionTimestamps.push_back(channel->mPositionKeys[j].mTime);
-				track.positions.push_back(channel->mPositionKeys[j].mValue);
-			}
-			for (int j = 0; j < channel->mNumRotationKeys; j++) {
-				track.rotationTimestamps.push_back(channel->mRotationKeys[j].mTime);
-				track.rotations.push_back(channel->mRotationKeys[j].mValue);
-
-			}
-			for (int j = 0; j < channel->mNumScalingKeys; j++) {
-				track.scaleTimestamps.push_back(channel->mScalingKeys[j].mTime);
-				track.scales.push_back(channel->mScalingKeys[j].mValue);
-
-			}
-			animation.boneTransforms[channel->mNodeName.C_Str()] = track;
-		}
-	}
-}
-
-std::pair<UINT, float> Model::getTimeFraction(std::vector<float>& times, float& dt)
-{
-	if (times.size() <= 1)
-		return { 0, 0.0f };
-	UINT segment = 0;
-	while (dt > times[segment])
-		segment++;
-	float start = times[segment - 1];
-	float end = times[segment];
-	float frac = (dt - start) / (end - start);
-	return { segment, frac };
-}
-
-void Model::getPose(Animation& animation, Bone& skeleton, float dt, std::vector<XMMATRIX>& output, XMMATRIX& parentTransform, XMMATRIX& globalInverseTransform)
-{
-	XMMATRIX globalTransform = parentTransform;
-	if (!skeleton.name.empty())
-	{
-		BoneTransformTrack& btt = animation.boneTransforms[skeleton.name];
-
-		dt = fmod(dt, animation.duration);
-
-		float newdt = dt / animation.duration * (btt.positionTimestamps.size() - 1);
-		if (newdt > 10.0f)
-		{
-			int a = 1;
-		}
-		std::pair<UINT, float> fp;
-
-		aiVector3D position = aiVector3D(0.0f, 0.0f, 0.0f);
-		aiQuaternion rotation = aiQuaternion(0.0f, 0.0f, 0.0f, 0.0f);
-		aiVector3D scale = aiVector3D(1.0f, 1.0f, 1.0f);
-		//calculate interpolated position
-		if (btt.positionTimestamps.size() > 1)
-		{
-			fp = getTimeFraction(btt.positionTimestamps, newdt);
-
-			aiVector3D position1 = btt.positions[fp.first - 1];
-			aiVector3D position2 = btt.positions[fp.first];
-			position = this->Lerp(position1, position2, fp.second);
-		}
-		else if (btt.positionTimestamps.size() == 1)
-		{
-			position = btt.positions[0];
-		}
-		//calculate interpolated rotation
-
-		if (btt.positionTimestamps.size() > 1)
-		{
-			fp = getTimeFraction(btt.rotationTimestamps, newdt);
-			aiQuaternion rotation1 = btt.rotations[fp.first - 1].Normalize();
-			aiQuaternion rotation2 = btt.rotations[fp.first].Normalize();
-			aiQuaternion::Interpolate(rotation, rotation1, rotation2, fp.second);
-		}
-		else if (btt.positionTimestamps.size() == 1)
-		{
-			rotation = btt.rotations[0];
-		}
-
-		//calculate interpolated scale
-		if (btt.positionTimestamps.size() > 1)
-		{
-			fp = getTimeFraction(btt.scaleTimestamps, newdt);
-			aiVector3D scale1 = btt.scales[fp.first - 1];
-			aiVector3D scale2 = btt.scales[fp.first];
-
-			scale = this->Lerp(scale1, scale2, fp.second);
-		}
-		else if (btt.positionTimestamps.size() == 1)
-		{
-			scale = btt.scales[0];
-		}
-		XMMATRIX positionMat = XMMatrixIdentity(),
-			scaleMat = XMMatrixIdentity();
-		// calculate localTransform
-		XMVECTOR rotationQuater = { rotation.x, rotation.y, rotation.z, rotation.w };
-		XMMATRIX rotationMatrix = XMMatrixRotationQuaternion(rotationQuater);
-
-
-		positionMat = XMMatrixTranslation(position.x, position.y, position.z);
-		scaleMat = XMMatrixScaling(scale.x, scale.y, scale.z);
-		XMMATRIX localTransform = scaleMat * rotationMatrix * positionMat;
-		aiMatrix4x4 ailocalTransform = aiMatrix4x4(scale, rotation, position);
-		//XMMATRIX localTransform = XMMATRIX(&ailocalTransform.a1);
-		globalTransform = localTransform * globalTransform;
-
-		output[skeleton.id] = (skeleton.offset * globalTransform) * globalInverseTransform;
-		_test.push_back(skeleton.id);
-		_test2.push_back(skeleton.name);
-	}
-	
-	
-	//output[skeletion.id] = localTransform;
-	//update values for children bones
-	for (Bone& child : skeleton.children) {
-		getPose(animation, child, dt, output, globalTransform, globalInverseTransform);
-	}
-}
-
-aiVector3D Model::Lerp(aiVector3D value1, aiVector3D value2, float amount)
-{
-	if (amount < 0.0f || amount>1.0f)
-	{
-		int a = 1;
-	}
-	return value1 + ((value2 - value1) * amount);
-}
-
-//XMMATRIX Model::assimpToXMMATRIX(aiMatrix4x4& mat)
-//{
-//	DirectX::XMMATRIX m;
-//	m.r[0]_
-//	for (int y = 0; y < 4; y++)
-//	{
-//		for (int x = 0; x < 4; x++)
-//		{
-//			m[0][0];
-//			m[0][0] = mat[y][x];
-//		}
-//	}
-//	return m;
-//}

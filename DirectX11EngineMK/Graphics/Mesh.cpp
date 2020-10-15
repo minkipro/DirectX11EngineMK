@@ -40,6 +40,11 @@ void Mesh::Draw()
 	_deviceContext->DrawIndexed(_indexbuffer.IndexCount(), 0, 0);
 }
 
+void Mesh::SetTransformMatrix(DirectX::XMMATRIX& transformMatrix)
+{
+	_transformMatrix = transformMatrix;
+}
+
 const DirectX::XMMATRIX& Mesh::GetTransformMatirx()
 {
 	return _transformMatrix;
