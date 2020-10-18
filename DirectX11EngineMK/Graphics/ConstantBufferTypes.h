@@ -10,6 +10,7 @@ struct CB_VS_vertexshader
 struct CB_VS_vertexshader_color
 {
 	DirectX::XMMATRIX wvpMatrix;
+	DirectX::XMVECTOR cameraPos;
 };
 
 struct CB_VS_vertexshader_2D

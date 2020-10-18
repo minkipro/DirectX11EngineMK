@@ -106,7 +106,6 @@ bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11
 void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix)
 {
 	float currentTime = (float)_timer.GetMilisecondsElapsed();
-	currentTime *= 0.05f;
 	SetAnimBoneTransform(currentTime, 0);
 	_deviceContext->VSSetConstantBuffers(0, 1, _cb_vs_vertexshader_skeleton->GetAddressOf());
 	for (int i = 0; i < _meshes.size(); i++)
@@ -289,11 +288,12 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 
 void Model::SetAnimBoneTransform(float animationTime, const int animationIndex)
 {
+	animationTime /= _pScene->mAnimations[animationIndex]->mDuration;
 	animationTime = fmod(animationTime, _pScene->mAnimations[animationIndex]->mDuration);
-	ProcessNodeAnim(animationTime, _pScene->mRootNode, XMMatrixIdentity(), 0);
+	ProcessNodeAnim(animationTime, _pScene->mRootNode, XMMatrixIdentity());
 }
 
-void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& parentTransform, int meshIndex)
+void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& parentTransform)
 {
 	string nodeName = node->mName.data;
 	const aiAnimation* animation = _pScene->mAnimations[0];
@@ -321,14 +321,10 @@ void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& p
 		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform * XMMatrixTranspose(XMMATRIX(&_pScene->mRootNode->mTransformation.a1));
 		_currentBone[_boneInfo[nodeName].first] = finalTransform;
 	}
-	else
-	{
-		meshIndex += node->mNumMeshes;
-	}
 	
 	for (UINT i = 0; i < node->mNumChildren; i++)
 	{
-		ProcessNodeAnim(animationTime, node->mChildren[i], globalTransform, meshIndex);
+		ProcessNodeAnim(animationTime, node->mChildren[i], globalTransform);
 	}
 }
 

@@ -48,7 +48,7 @@ void Graphics::RenderFrame()
 	_deviceContext->IASetInputLayout(_vertexShader_color.GetInputLayout());
 	
 	{
-		_geometry.Draw(viewProj);
+		_geometry.Draw(viewProj,_camera3D.GetPositionVector());
 	}
 
 	
@@ -64,7 +64,22 @@ void Graphics::RenderFrame()
 	}
 
 	_spriteBatch->Begin();
+	/*auto boneInfo = _gameObject.GetModel()->GetBoneInfo();
+	boneInfo->begin();
+	for (auto it : *boneInfo)
+	{
+		XMVECTOR pos = { 0.0f,0.0f,0.0f };
+		pos = XMVector3Transform(pos, it.second.second* (*_gameObject.GetWorldMatrix())*viewProj);
+		_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(it.first).c_str(), XMFLOAT2(pos.m128_f32[0], pos.m128_f32[1]), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+
+	}*/
+	XMVECTOR pos = { 0.0f, 0.0f, 0.0f };
+	pos = XMVector3Transform(pos, viewProj);
+	
+	_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide("test").c_str(), XMFLOAT2(pos.m128_f32[0]*_factor+_windowWidth*0.5f, -pos.m128_f32[1]*_factor+_windowHeight*0.5f), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
 	_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(fpsString).c_str(), XMFLOAT2(0, 0), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+	
+	
 	_spriteBatch->End();
 
 	static int counter = 0;
@@ -72,8 +87,10 @@ void Graphics::RenderFrame()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Begin("Camera Speed");
-	ImGui::DragFloat("Camera Speed", &_camera3DSpeed, 0.01f, 0.0f, 1.0f);
-	ImGui::DragFloat("Camera Rot Speed", &_cameraRotSpeed, 0.001f, 0.0f, 1.0f);
+	ImGui::DragFloat("factor", &_factor, 0.01f, -10.0f, 10.0f);
+	ImGui::DragFloat3("pos", pos.m128_f32);
+		/*ImGui::DragFloat("Camera Speed", &_camera3DSpeed, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("Camera Rot Speed", &_cameraRotSpeed, 0.001f, 0.0f, 1.0f);*/
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());

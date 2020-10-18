@@ -83,4 +83,6 @@ public:
 	Camera2D _camera2D;
 	Sprite _sprite;
 	Geometry _geometry;
+
+	float _factor = 1.0f;
 };
