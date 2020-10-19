@@ -12,7 +12,7 @@ Camera3D::Camera3D()
 void Camera3D::SetProjectionValues(float fovDegrees, float aspectRatio, float nearZ, float farZ)
 {
 	float fovRadians = (fovDegrees / 360.0f) * XM_2PI;
-	_projectionMatrix = XMMatrixPerspectiveFovLH(fovRadians, aspectRatio, nearZ, farZ);
+	_projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(fovRadians, aspectRatio, nearZ, farZ);
 }
 
 const XMMATRIX& Camera3D::GetViewMatrix() const
@@ -27,11 +27,11 @@ const XMMATRIX& Camera3D::GetProjectionMatrix() const
 
 void Camera3D::UpdateMatrix() //Updates view matrix and also updates the movement vectors
 {
-	XMMATRIX camRotationMatrix = XMMatrixRotationRollPitchYaw(_rot.x, _rot.y, _rot.z);
+	XMMATRIX camRotationMatrix = DirectX::XMMatrixRotationRollPitchYaw(_rot.x, _rot.y, _rot.z);
 	XMVECTOR camTarget = XMVector3TransformCoord(DEFAULT_FORWARD_VECTOR, camRotationMatrix);
 	camTarget += _posVector;
 	XMVECTOR upDir = XMVector3TransformCoord(DEFAULT_UP_VECTOR, camRotationMatrix);
-	_viewMatrix = XMMatrixLookAtLH(_posVector, camTarget, upDir);
+	_viewMatrix = DirectX::XMMatrixLookAtLH(_posVector, camTarget, upDir);
 
 	UpdateDirectionVectors();
 }

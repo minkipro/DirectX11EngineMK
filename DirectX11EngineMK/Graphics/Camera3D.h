@@ -1,6 +1,5 @@
 #pragma once
 #include "GameObject3D.h"
-using namespace DirectX;
 
 class Camera3D : public GameObject3D
 {

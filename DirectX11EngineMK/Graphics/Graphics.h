@@ -34,6 +34,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext>		_deviceContext;
 	Microsoft::WRL::ComPtr<IDXGISwapChain>			_swapchain;
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView>	_renderTargetView;
+	UINT _numViewport = 0;
 	
 
 	VertexShader									_vertexShader_2d;

@@ -24,7 +24,11 @@ void Graphics::RenderFrame()
 	{
 		return;
 	}
-	XMMATRIX viewProj = _camera3D.GetViewMatrix() * _camera3D.GetProjectionMatrix();
+	XMMATRIX viewMatrix = _camera3D.GetViewMatrix();
+	XMMATRIX projectionMatrix = _camera3D.GetProjectionMatrix();
+	XMVECTOR viewS, viewR, viewT;
+	XMMatrixDecompose(&viewS, &viewR, &viewT, viewMatrix);
+	XMMATRIX viewProj = viewMatrix * projectionMatrix;
 
 	float bgcolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	_deviceContext->ClearRenderTargetView(_renderTargetView.Get(), bgcolor);
@@ -74,9 +78,17 @@ void Graphics::RenderFrame()
 
 	}*/
 	XMVECTOR pos = { 0.0f, 0.0f, 0.0f };
-	pos = XMVector3Transform(pos, viewProj);
-	
-	_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide("test").c_str(), XMFLOAT2(pos.m128_f32[0]*_factor+_windowWidth*0.5f, -pos.m128_f32[1]*_factor+_windowHeight*0.5f), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+	pos = XMVector3Transform(pos, viewMatrix * projectionMatrix);
+
+	XMFLOAT3 fpos;
+	XMStoreFloat3(&fpos, pos);
+
+	fpos.x = (fpos.x + 1.0f) * _windowWidth * 0.5f;
+	fpos.y = (-fpos.y + 1.0f) * _windowHeight * 0.5f;
+	if (fpos.z > 0)
+	{
+		_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide("test").c_str(), XMFLOAT2(fpos.x, fpos.y), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+	}
 	_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(fpsString).c_str(), XMFLOAT2(0, 0), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
 	
 	
@@ -87,8 +99,10 @@ void Graphics::RenderFrame()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Begin("Camera Speed");
-	ImGui::DragFloat("factor", &_factor, 0.01f, -10.0f, 10.0f);
-	ImGui::DragFloat3("pos", pos.m128_f32);
+	ImGui::DragFloat3("pos", &fpos.x);
+	ImGui::DragFloat3("viewS", viewS.m128_f32);
+	ImGui::DragFloat4("viewR", viewR.m128_f32);
+	ImGui::DragFloat3("viewT", viewT.m128_f32);
 		/*ImGui::DragFloat("Camera Speed", &_camera3DSpeed, 0.01f, 0.0f, 1.0f);
 		ImGui::DragFloat("Camera Rot Speed", &_cameraRotSpeed, 0.001f, 0.0f, 1.0f);*/
 	ImGui::End();
@@ -147,7 +161,6 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
 		hr = _swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
 		COM_ERROR_IF_FAILED(hr, "GetBuffer Failed.");
-
 		hr = _device->CreateRenderTargetView(backBuffer.Get(), NULL, _renderTargetView.GetAddressOf());
 		COM_ERROR_IF_FAILED(hr, "Failed to create render target view.");
 
@@ -175,7 +188,6 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		CD3D11_VIEWPORT viewport(0.0f, 0.0f, static_cast<float>(_windowWidth), static_cast<float>(_windowHeight));
 
 		_deviceContext->RSSetViewports(1, &viewport);
-
 		//Create Rasterizer State
 		CD3D11_RASTERIZER_DESC rasterizerDesc(D3D11_DEFAULT);
 		hr = _device->CreateRasterizerState(&rasterizerDesc, _rasterizerState.GetAddressOf());
