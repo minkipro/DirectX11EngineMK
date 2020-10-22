@@ -14,7 +14,6 @@ public:
 	Mesh(ID3D11Device* device, ID3D11DeviceContext* deviceContext, std::vector<Vertex3D_Skeleton>& vertices, std::vector<DWORD>& indices, std::vector<Texture>& textures, const DirectX::XMMATRIX& transformMatrix);
 	Mesh(const Mesh& mesh);
 	void Draw();
-	void SetTransformMatrix(DirectX::XMMATRIX& transformMatrix);
 	const DirectX::XMMATRIX& GetTransformMatirx();
 private:
 	VertexBuffer<Vertex3D_Skeleton>	_vertexbuffer;

@@ -30,7 +30,7 @@ VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
     float4x4 boneTransform = { 1.0f, 0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,0.0f,0.0f,0.0f,1.0f };
-    if (input.inBoneWeightsA.x != 0)
+    //if (input.inBoneWeightsA.x != 0)
     {
         boneTransform = float4x4(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         boneTransform += mul(bone_transforms[(int) (input.inBoneIdA.x)], input.inBoneWeightsA.x);

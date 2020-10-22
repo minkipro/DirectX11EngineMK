@@ -26,8 +26,6 @@ void Graphics::RenderFrame()
 	}
 	XMMATRIX viewMatrix = _camera3D.GetViewMatrix();
 	XMMATRIX projectionMatrix = _camera3D.GetProjectionMatrix();
-	XMVECTOR viewS, viewR, viewT;
-	XMMatrixDecompose(&viewS, &viewR, &viewT, viewMatrix);
 	XMMATRIX viewProj = viewMatrix * projectionMatrix;
 
 	float bgcolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -68,27 +66,23 @@ void Graphics::RenderFrame()
 	}
 
 	_spriteBatch->Begin();
-	/*auto boneInfo = _gameObject.GetModel()->GetBoneInfo();
-	boneInfo->begin();
-	for (auto it : *boneInfo)
+	/*for (int i = 0; i < 100; i++)
 	{
-		XMVECTOR pos = { 0.0f,0.0f,0.0f };
-		pos = XMVector3Transform(pos, it.second.second* (*_gameObject.GetWorldMatrix())*viewProj);
-		_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(it.first).c_str(), XMFLOAT2(pos.m128_f32[0], pos.m128_f32[1]), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+		XMVECTOR pos = { (float)i,(float)i,(float)i };
+		pos *= 10.0f;
+		pos = XMVector3Transform(pos, (*_gameObject.GetWorldMatrix()));
 
+		XMFLOAT2 screenCoord;
+		bool zSine = getScreenCoord(screenCoord, pos, viewProj);
+		if (zSine > 0)
+		{
+			char buffer[1024] = {0,};
+			_itoa_s(i, buffer,10);
+			_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(buffer).c_str(), screenCoord, DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
+
+		}
 	}*/
-	XMVECTOR pos = { 0.0f, 0.0f, 0.0f };
-	pos = XMVector3Transform(pos, viewMatrix * projectionMatrix);
 
-	XMFLOAT3 fpos;
-	XMStoreFloat3(&fpos, pos);
-
-	fpos.x = (fpos.x + 1.0f) * _windowWidth * 0.5f;
-	fpos.y = (-fpos.y + 1.0f) * _windowHeight * 0.5f;
-	if (fpos.z > 0)
-	{
-		_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide("test").c_str(), XMFLOAT2(fpos.x, fpos.y), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
-	}
 	_spriteFont->DrawString(_spriteBatch.get(), StringHelper::StringToWide(fpsString).c_str(), XMFLOAT2(0, 0), DirectX::Colors::Black, 0.0f, XMFLOAT2(0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f));
 	
 	
@@ -98,14 +92,14 @@ void Graphics::RenderFrame()
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-	ImGui::Begin("Camera Speed");
-	ImGui::DragFloat3("pos", &fpos.x);
-	ImGui::DragFloat3("viewS", viewS.m128_f32);
-	ImGui::DragFloat4("viewR", viewR.m128_f32);
-	ImGui::DragFloat3("viewT", viewT.m128_f32);
-		/*ImGui::DragFloat("Camera Speed", &_camera3DSpeed, 0.01f, 0.0f, 1.0f);
-		ImGui::DragFloat("Camera Rot Speed", &_cameraRotSpeed, 0.001f, 0.0f, 1.0f);*/
-	ImGui::End();
+	//ImGui::Begin("Camera Speed");
+	//ImGui::DragFloat3("pos", &fpos.x);
+	//ImGui::DragFloat3("viewS", viewS.m128_f32);
+	//ImGui::DragFloat4("viewR", viewR.m128_f32);
+	//ImGui::DragFloat3("viewT", viewT.m128_f32);
+	///*ImGui::DragFloat("Camera Speed", &_camera3DSpeed, 0.01f, 0.0f, 1.0f);
+	//ImGui::DragFloat("Camera Rot Speed", &_cameraRotSpeed, 0.001f, 0.0f, 1.0f);*/
+	//ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -391,4 +385,18 @@ void Graphics::InitializeImgui(HWND hwnd)
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX11_Init(_device.Get(), _deviceContext.Get());
 	ImGui::StyleColorsDark();
+}
+
+bool Graphics::getScreenCoord(DirectX::XMFLOAT2& output, DirectX::XMVECTOR input, DirectX::XMMATRIX& viewProj)
+{
+	XMVECTOR pos = XMVector3TransformCoord(input, viewProj);
+	XMVECTOR pos_ = XMVector3Transform(input, viewProj);
+
+	XMFLOAT3 fpos;
+	XMStoreFloat3(&fpos, pos);
+
+	output.x = (fpos.x + 1.0f) * _windowWidth * 0.5f;
+	output.y = (-fpos.y + 1.0f) * _windowHeight * 0.5f;
+
+	return pos_.m128_f32[2] > 0.0f;
 }

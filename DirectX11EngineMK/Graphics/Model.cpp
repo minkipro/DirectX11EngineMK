@@ -7,6 +7,8 @@ unsigned int FindKeyIndex(const float animationTime, const int numKeys, const ai
 		if (animationTime < (float)vectorKey[i + 1].mTime)
 			return i;
 	assert(0);
+
+	return 0;
 }
 
 unsigned int FindKeyIndex(const float animationTime, const int numKeys, const aiQuatKey* const quatKey)
@@ -16,6 +18,8 @@ unsigned int FindKeyIndex(const float animationTime, const int numKeys, const ai
 		if (animationTime < (float)quatKey[i + 1].mTime)
 			return i;
 	assert(0);
+
+	return 0;
 }
 
 aiVector3D CalcInterpolatedValueFromKey(float animationTime, const int numKeys, const aiVectorKey* const vectorKey)
@@ -113,7 +117,7 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 		//Update Constant buffer with WVP Matrix
 		_cb_vs_vertexshader_skeleton->_data.worldMatrix = _meshes[i].GetTransformMatirx() * worldMatrix;
 		_cb_vs_vertexshader_skeleton->_data.wvpMatrix = _cb_vs_vertexshader_skeleton->_data.worldMatrix * viewProjectionMatrix; //Calculate World-View-Projection Matrix
-		
+
 		for (int i = 0; i < 100; i++)
 		{
 			_cb_vs_vertexshader_skeleton->_data.boneTransform[i] = _currentBone[i];
@@ -124,11 +128,12 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 	}
 }
 
+
 bool Model::LoadModel(const std::string& filePath)
 {
 
 	_directory = StringHelper::GetDirectoryFromPath(filePath);
-	
+
 
 	_pScene = _importer.ReadFile(filePath,
 		aiProcess_Triangulate |
@@ -184,7 +189,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 		vertices.push_back(vertex);
 	}
 
-	
+
 	std::vector<UINT> boneCounts;
 	boneCounts.resize(vertices.size(), 0);
 
@@ -239,8 +244,8 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 				int a = 1;
 
 			}
-				//std::cout << "err: unable to allocate bone to vertex" << std::endl;
-				break;
+			//std::cout << "err: unable to allocate bone to vertex" << std::endl;
+			break;
 			}
 		}
 	}
@@ -305,13 +310,12 @@ void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& p
 	{
 		const aiVector3D& scaling = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumScalingKeys, nodeAnim->mScalingKeys);
 		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
-
+		
 		const aiQuaternion& rotationQ = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumRotationKeys, nodeAnim->mRotationKeys);
 		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
 
 		const aiVector3D& translation = CalcInterpolatedValueFromKey(animationTime, nodeAnim->mNumPositionKeys, nodeAnim->mPositionKeys);
 		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
-
 		nodeTransformMatrix = scalingM * rotationM * translationM;
 	}
 
@@ -321,7 +325,7 @@ void Model::ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& p
 		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform * XMMatrixTranspose(XMMATRIX(&_pScene->mRootNode->mTransformation.a1));
 		_currentBone[_boneInfo[nodeName].first] = finalTransform;
 	}
-	
+
 	for (UINT i = 0; i < node->mNumChildren; i++)
 	{
 		ProcessNodeAnim(animationTime, node->mChildren[i], globalTransform);
@@ -448,8 +452,8 @@ int Model::GetTextureIndex(aiString* pStr)
 
 aiNodeAnim* Model::FindNodeAnim(const aiAnimation* animation, const string nodeName)
 {
-	 for (int i = 0; i < animation->mNumChannels; i++)
-        if (animation->mChannels[i]->mNodeName.data == nodeName)
-            return animation->mChannels[i];
-    return nullptr;
+	for (int i = 0; i < animation->mNumChannels; i++)
+		if (animation->mChannels[i]->mNodeName.data == nodeName)
+			return animation->mChannels[i];
+	return nullptr;
 }
