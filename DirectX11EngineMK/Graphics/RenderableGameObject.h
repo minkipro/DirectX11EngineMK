@@ -12,6 +12,7 @@ public:
 	XMMATRIX* GetWorldMatrix() { return &_worldMatrix; }
 
 protected:
+public:
 	Model _model;
 	void UpdateMatrix() override;
 	XMMATRIX							_worldMatrix = XMMatrixIdentity();

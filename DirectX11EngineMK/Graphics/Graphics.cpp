@@ -92,6 +92,22 @@ void Graphics::RenderFrame()
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+
+	
+	vector<string> nodeNames;
+	for (auto it : _gameObject._model._testMap)
+	{
+		nodeNames.push_back(it.first);
+		/*ImGui::Begin(it.first.c_str() + 30);
+		ImGui::DragFloat3("scale", &it.second.scale.m128_f32[0]);
+		ImGui::DragFloat3("rotation", &it.second.rotation.m128_f32[0]);
+		ImGui::DragFloat3("trans", &it.second.translation.m128_f32[0]);
+		ImGui::DragFloat3("postscale", &it.second.postscale.m128_f32[0]);
+		ImGui::DragFloat3("postrotation", &it.second.postrotation.m128_f32[0]);
+		ImGui::DragFloat3("posttrans", &it.second.posttranslation.m128_f32[0]);
+		ImGui::End();*/
+	}
+	
 	//ImGui::Begin("Camera Speed");
 	//ImGui::DragFloat3("pos", &fpos.x);
 	//ImGui::DragFloat3("viewS", viewS.m128_f32);
@@ -350,6 +366,13 @@ bool Graphics::InitializeScene()
 		{
 			return false;
 		}
+
+		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\rp_sophia_animated_003_idling.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
+		{
+			return false;
+		}*/
+
+		
 
 		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\Spider.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
 		{

@@ -10,6 +10,17 @@ struct BoneInfo
 	XMMATRIX finalTransform;
 };
 
+struct testdata
+{
+	XMVECTOR scale;
+	XMVECTOR rotation;
+	XMVECTOR translation;
+
+	XMVECTOR postscale;
+	XMVECTOR postrotation;
+	XMVECTOR posttranslation;
+};
+
 class Model
 {
 public:
@@ -21,7 +32,7 @@ private:
 	void ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix);
 	Mesh ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix);
 	void SetAnimBoneTransform(float animationTime, const int animationIndex);
-	void ProcessNodeAnim(float animationTime, aiNode* node, const XMMATRIX& parentTransform);
+	void ProcessNodeAnim(float tick, aiNode* node, const XMMATRIX& parentTransform);
 	TextureStorageType DetermineTextureStorageType(const aiScene* pScene, aiMaterial* pMat, unsigned int index, aiTextureType textureType);
 	std::vector<Texture> LoadMaterialTextures(aiMaterial* pMaterial, aiTextureType textureType, const aiScene* pScene);
 	int GetTextureIndex(aiString* pStr);
@@ -44,4 +55,7 @@ private:
 	XMMATRIX _currentBone[100];
 
 	std::unordered_map<std::string, std::pair<int, XMMATRIX>> _boneInfo = {};
+
+public:
+	std::unordered_map<std::string, testdata> _testMap;
 };
