@@ -137,14 +137,12 @@ bool Model::LoadModel(const std::string& filePath)
 
 	_directory = StringHelper::GetDirectoryFromPath(filePath);
 
-
 	_pScene = _importer.ReadFile(filePath,
 		aiProcess_Triangulate |
 		aiProcess_ConvertToLeftHanded);
 	if (_pScene == nullptr)
 		return false;
 
-	_globalInverseTransform = XMMATRIX(&_pScene->mRootNode->mTransformation.Inverse().a1);
 	ProcessNode(_pScene->mRootNode, DirectX::XMMatrixIdentity());
 
 	return true;
@@ -153,6 +151,10 @@ bool Model::LoadModel(const std::string& filePath)
 void Model::ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix)
 {
 	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)) * parentTransformMatrix;
+	if (strcmp(node->mName.data, "rp_nathan_animated_003_walking_root") == 0)
+	{
+		_tempRootNode = node;
+	}
 	for (UINT i = 0; i < node->mNumMeshes; i++)
 	{
 		aiMesh* mesh = _pScene->mMeshes[node->mMeshes[i]];
@@ -201,12 +203,15 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 		XMMATRIX offsetMatrix = XMMatrixTranspose(XMMATRIX(&bone->mOffsetMatrix.a1));
 		//XMMATRIX offsetMatrix = XMMATRIX(&bone->mOffsetMatrix.a1)*openGlToDirectX;
 		_boneInfo[bone->mName.C_Str()] = { i, offsetMatrix };
-
 		for (UINT j = 0; j < bone->mNumWeights; j++)
 		{
 			UINT id = bone->mWeights[j].mVertexId;
 			float weight = bone->mWeights[j].mWeight;
 			boneCounts[id]++;
+			if (weight == 0)
+			{
+				int a = 1;
+			}
 			switch (boneCounts[id])
 			{
 			case 1:
@@ -243,7 +248,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 				break;
 			default:
 			{
-				int a = 1;
+				assert(0);
 
 			}
 			//std::cout << "err: unable to allocate bone to vertex" << std::endl;
@@ -298,53 +303,41 @@ void Model::SetAnimBoneTransform(float animationTime, const int animationIndex)
 	float tick = animationTime * 0.001f * _pScene->mAnimations[animationIndex]->mTicksPerSecond;
 	tick = fmod(tick, _pScene->mAnimations[animationIndex]->mDuration);
 	ProcessNodeAnim(tick, _pScene->mRootNode, XMMatrixIdentity());
-	//ProcessNodeAnim(0, _pScene->mRootNode, XMMatrixIdentity());
 }
 
 void Model::ProcessNodeAnim(float tick, aiNode* node, const XMMATRIX& parentTransform)
 {
 	string nodeName = node->mName.data;
 	const aiAnimation* animation = _pScene->mAnimations[0];
-	
+
 	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
 	const aiNodeAnim* nodeAnim = FindNodeAnim(animation, nodeName);
-	
-	if (nodeAnim)
-	{
-		const aiVector3D& scaling = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumScalingKeys, nodeAnim->mScalingKeys);
-		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
 
-		const aiQuaternion& rotationQ = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumRotationKeys, nodeAnim->mRotationKeys);
-		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
-
-		const aiVector3D& translation = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumPositionKeys, nodeAnim->mPositionKeys);
-		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
-		
-		testdata data;
-		XMMatrixDecompose(&data.scale, &data.rotation, &data.translation, nodeTransformMatrix);
-		
-		data.postscale = { scaling.x, scaling.y, scaling.z };
-		data.postrotation = { rotationQ.x, rotationQ.y, rotationQ.z , rotationQ .w};
-		data.posttranslation = { translation.x, translation.y, translation.z };
-		_testMap[nodeName] = data;
-		nodeTransformMatrix = scalingM * rotationM * translationM;
-	}
+	CalNodeTransformMatrix(nodeAnim, nodeTransformMatrix, tick);
 
 	XMMATRIX globalTransform = nodeTransformMatrix * parentTransform;
+
+	//test
+	XMMATRIX rootNodeTransform = XMMatrixTranspose(XMMATRIX(&_tempRootNode->mTransformation.a1));
+
+	const aiNodeAnim* rootNodeAnim = FindNodeAnim(animation, _tempRootNode->mName.data);
+	CalNodeTransformMatrix(rootNodeAnim, rootNodeTransform, tick);
+	//
 	if (_boneInfo.find(nodeName) != _boneInfo.end())
 	{
-		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform * XMMatrixTranspose(XMMATRIX(&_pScene->mRootNode->mTransformation.a1));
-
-		
-		_currentBone[_boneInfo[nodeName].first] = finalTransform;
-	}
-	else
-	{
-		if (nodeAnim)
+		vector<int> indexs;
+		for (int i = 0; i < indexs.size(); i++)
 		{
-			int a = 1;
+			if (indexs[i] == _boneInfo[nodeName].first)
+			{
+				nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
+				globalTransform = nodeTransformMatrix * parentTransform;
+				break;
+			}
 		}
-		
+
+		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform*XMMatrixInverse(nullptr, rootNodeTransform);
+		_currentBone[_boneInfo[nodeName].first] = finalTransform;
 	}
 	for (UINT i = 0; i < node->mNumChildren; i++)
 	{
@@ -476,4 +469,24 @@ aiNodeAnim* Model::FindNodeAnim(const aiAnimation* animation, const string nodeN
 		if (animation->mChannels[i]->mNodeName.data == nodeName)
 			return animation->mChannels[i];
 	return nullptr;
+}
+
+void Model::CalNodeTransformMatrix(const aiNodeAnim* nodeAnim, XMMATRIX& nodeTransform, float tick)
+{
+	if (nodeAnim)
+	{
+		const aiVector3D& scaling = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumScalingKeys, nodeAnim->mScalingKeys);
+		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
+
+		const aiQuaternion& rotationQ = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumRotationKeys, nodeAnim->mRotationKeys);
+		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
+
+		const aiVector3D& translation = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumPositionKeys, nodeAnim->mPositionKeys);
+		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
+		if (abs(translation.x) > 100 || abs(translation.z) > 100)
+		{
+			int a = 1;
+		}
+		nodeTransform = scalingM * rotationM * translationM;
+	}
 }

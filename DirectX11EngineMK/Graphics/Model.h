@@ -37,7 +37,7 @@ private:
 	std::vector<Texture> LoadMaterialTextures(aiMaterial* pMaterial, aiTextureType textureType, const aiScene* pScene);
 	int GetTextureIndex(aiString* pStr);
 	aiNodeAnim* FindNodeAnim(const aiAnimation* animation, const string nodeName);
-
+	void CalNodeTransformMatrix(const aiNodeAnim* nodeAnim, XMMATRIX& nodeTransform, float tick);
 private:
 	std::vector<Mesh>					_meshes;
 
@@ -46,14 +46,13 @@ private:
 		= nullptr;
 	ConstantBuffer<CB_VS_vertexshader_skeleton>* _cb_vs_vertexshader_skeleton		= nullptr;
 	std::string							_directory				= "";
-	XMMATRIX _globalInverseTransform;
 	Timer _timer;
 
 	Assimp::Importer _importer;
 	const aiScene* _pScene = nullptr;
 
 	XMMATRIX _currentBone[100];
-
+	aiNode* _tempRootNode;
 	std::unordered_map<std::string, std::pair<int, XMMATRIX>> _boneInfo = {};
 
 public:

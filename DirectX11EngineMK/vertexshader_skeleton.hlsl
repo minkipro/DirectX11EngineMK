@@ -30,7 +30,7 @@ VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
     float4x4 boneTransform = { 1.0f, 0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,0.0f,0.0f,0.0f,1.0f };
-    //if (input.inBoneWeightsA.x != 0)
+    if (input.inBoneWeightsA.x != 0)
     {
         boneTransform = float4x4(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         boneTransform += mul(bone_transforms[(int) (input.inBoneIdA.x)], input.inBoneWeightsA.x);
@@ -45,7 +45,6 @@ VS_OUTPUT main(VS_INPUT input)
    
     
     float4 pos = mul(float4(input.inPos, 1.0f), boneTransform);
-    //float4 pos = mul(float4(0.0f, 0.0f, 0.0f, 1.0f), boneTransform);
     output.outPosition = mul(pos, wvpMatrix);
     output.outTexCoord = input.inTexCoord;
     output.outNormal = normalize(mul(float4(input.inNormal, 0.0f), mul(worldMatrix, boneTransform)));
