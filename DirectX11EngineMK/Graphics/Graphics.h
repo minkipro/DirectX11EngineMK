@@ -22,6 +22,7 @@ class Graphics
 public:
 	bool Initialize(HWND hwnd, int width, int height);
 	void RenderFrame();
+	~Graphics();
 
 private:
 	bool InitializeDirectX(HWND hwnd);
@@ -30,7 +31,6 @@ private:
 	void InitializeImgui(HWND hwnd);
 
 	bool getScreenCoord(DirectX::XMFLOAT2& output, DirectX::XMVECTOR input, DirectX::XMMATRIX& viewProj);
-
 private:
 	Microsoft::WRL::ComPtr<ID3D11Device>			_device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext>		_deviceContext;
@@ -80,7 +80,7 @@ public:
 	float _camera3DSpeed;
 	float _cameraRotSpeed;
 	Camera3D _camera3D;
-	RenderableGameObject _gameObject;
+	vector<RenderableGameObject*> _gameObjects;
 	Timer _fpsTimer;
 
 	Camera2D _camera2D;

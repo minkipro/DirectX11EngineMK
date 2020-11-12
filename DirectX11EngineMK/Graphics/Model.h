@@ -25,8 +25,8 @@ class Model
 {
 public:
 	bool Initialize(const std::string& filePath, ID3D11Device* device, ID3D11DeviceContext* deviceContext, ConstantBuffer<CB_VS_vertexshader_skeleton>& cb_vs_vertexshader_skeleton);
-	void Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix);
-
+	void Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix, float* currentTime);
+	bool GetIsAnim() { return _isAnim; }
 private:
 	bool LoadModel(const std::string& filePath);
 	void ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix);
@@ -38,6 +38,7 @@ private:
 	int GetTextureIndex(aiString* pStr);
 	aiNodeAnim* FindNodeAnim(const aiAnimation* animation, const string nodeName);
 	void CalNodeTransformMatrix(const aiNodeAnim* nodeAnim, XMMATRIX& nodeTransform, float tick);
+	
 private:
 	std::vector<Mesh>					_meshes;
 
@@ -52,9 +53,8 @@ private:
 	const aiScene* _pScene = nullptr;
 
 	XMMATRIX _currentBone[100];
-	aiNode* _tempRootNode;
 	std::unordered_map<std::string, std::pair<int, XMMATRIX>> _boneInfo = {};
+	XMMATRIX _axisMatrix;
 
-public:
-	std::unordered_map<std::string, testdata> _testMap;
+	bool _isAnim;
 };

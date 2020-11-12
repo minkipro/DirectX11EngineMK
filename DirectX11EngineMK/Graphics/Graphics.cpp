@@ -20,10 +20,6 @@ bool Graphics::Initialize(HWND hwnd, int width, int height)
 
 void Graphics::RenderFrame()
 {
-	if (_fpsTimer.GetMilisecondsElapsed() < 33.0)
-	{
-		return;
-	}
 	XMMATRIX viewMatrix = _camera3D.GetViewMatrix();
 	XMMATRIX projectionMatrix = _camera3D.GetProjectionMatrix();
 	XMMATRIX viewProj = viewMatrix * projectionMatrix;
@@ -42,7 +38,18 @@ void Graphics::RenderFrame()
 	_deviceContext->VSSetShader(_vertexShader_skeleton.GetShader(), NULL, 0);
 	_deviceContext->PSSetShader(_pixelShader_nolight.GetShader(), NULL, 0);
 	_deviceContext->IASetInputLayout(_vertexShader_skeleton.GetInputLayout());
-	_gameObject.Draw(viewProj);
+	float currentTime = _fpsTimer.GetMilisecondsElapsed();
+	for (size_t i = 0; i < _gameObjects.size(); i++)
+	{
+		if (_gameObjects[i]->GetIsAnim())
+		{
+			_gameObjects[i]->Draw(viewProj, &currentTime);
+		}
+		else
+		{
+			_gameObjects[i]->Draw(viewProj, nullptr);
+		}
+	}
 
 	_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST);
 	_deviceContext->VSSetShader(_vertexShader_color.GetShader(), NULL, 0);
@@ -94,19 +101,6 @@ void Graphics::RenderFrame()
 	ImGui::NewFrame();
 
 	
-	vector<string> nodeNames;
-	for (auto it : _gameObject._model._testMap)
-	{
-		nodeNames.push_back(it.first);
-		/*ImGui::Begin(it.first.c_str() + 30);
-		ImGui::DragFloat3("scale", &it.second.scale.m128_f32[0]);
-		ImGui::DragFloat3("rotation", &it.second.rotation.m128_f32[0]);
-		ImGui::DragFloat3("trans", &it.second.translation.m128_f32[0]);
-		ImGui::DragFloat3("postscale", &it.second.postscale.m128_f32[0]);
-		ImGui::DragFloat3("postrotation", &it.second.postrotation.m128_f32[0]);
-		ImGui::DragFloat3("posttrans", &it.second.posttranslation.m128_f32[0]);
-		ImGui::End();*/
-	}
 	
 	//ImGui::Begin("Camera Speed");
 	//ImGui::DragFloat3("pos", &fpos.x);
@@ -120,6 +114,17 @@ void Graphics::RenderFrame()
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	_swapchain->Present(0, NULL);
+}
+
+Graphics::~Graphics()
+{
+	for (size_t i = 0; i < _gameObjects.size(); i++)
+	{
+		if (_gameObjects[i]);
+		{
+			delete _gameObjects[i];
+		}
+	}
 }
 
 bool Graphics::InitializeDirectX(HWND hwnd)
@@ -358,26 +363,35 @@ bool Graphics::InitializeScene()
 		COM_ERROR_IF_FAILED(hr, "Failed to initialize constant buffer.");
 
 		//Initialize Model(s)
-		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\Nanosuit.obj", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader))
+
+		for (int i = 0; i < 1; i++)
+		{
+			_gameObjects.push_back(new RenderableGameObject);
+		}
+
+		/*if (!_gameObjects[0]->Initialize("Data\\Objects\\Nanosuit\\rp_nathan_animated_003_walking.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
 		{
 			return false;
 		}*/
-		if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\rp_nathan_animated_003_walking.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
+
+		/*if (!_gameObjects[1]->Initialize("Data\\Objects\\Nanosuit\\rp_sophia_animated_003_idling.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
+		{
+			return false;
+		}*/
+		if (!_gameObjects[0]->Initialize("Data\\Objects\\characters\\garen_2013_attack_01.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
 		{
 			return false;
 		}
+	
+		//_gameObjects[0]->SetPosition(100, 0, 0);
 
-		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\rp_sophia_animated_003_idling.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
+
+		/*if (!_gameObjects[2]->Initialize("Data\\Objects\\scifi tropical city\\Sci-fi Tropical city.obj", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
 		{
 			return false;
 		}*/
 
-		
 
-		/*if (!_gameObject.Initialize("Data\\Objects\\Nanosuit\\Spider.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
-		{
-			return false;
-		}*/
 		
 
 		if (!_sprite.Initialize(_device.Get(), _deviceContext.Get(), 256, 256, "Data/Textures/circle.png", _cb_vs_vertexshader_2d))

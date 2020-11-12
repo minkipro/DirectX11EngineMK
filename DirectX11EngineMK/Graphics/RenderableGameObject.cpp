@@ -11,9 +11,9 @@ bool RenderableGameObject::Initialize(const std::string& filePath, ID3D11Device*
 	return true;
 }
 
-void RenderableGameObject::Draw(const XMMATRIX& viewProjectionMatrix)
+void RenderableGameObject::Draw(const XMMATRIX& viewProjectionMatrix, float* currentTime)
 {
-	_model.Draw(_worldMatrix, viewProjectionMatrix);
+	_model.Draw(_worldMatrix, viewProjectionMatrix, currentTime);
 }
 
 void RenderableGameObject::UpdateMatrix()
