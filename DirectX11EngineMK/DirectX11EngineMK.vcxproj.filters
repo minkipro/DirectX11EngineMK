@@ -139,6 +139,12 @@
     <ClCompile Include="Graphics\XFileModel.cpp">
       <Filter>base\Graphics\GameObject\3D</Filter>
     </ClCompile>
+    <ClCompile Include="FileManager.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\CharacterManager.cpp">
+      <Filter>base\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorLogger.h">
@@ -260,6 +266,12 @@
     </ClInclude>
     <ClInclude Include="Graphics\XFileModel.h">
       <Filter>base\Graphics\GameObject\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="FileManager.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\CharacterManager.h">
+      <Filter>base\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -11,6 +11,11 @@ bool RenderableGameObject::Initialize(const std::string& filePath, ID3D11Device*
 	return true;
 }
 
+void RenderableGameObject::AddAnimation(const std::string& filePath)
+{
+	_model.LoadModel(filePath);
+}
+
 void RenderableGameObject::Draw(const XMMATRIX& viewProjectionMatrix, float* currentTime)
 {
 	_model.Draw(_worldMatrix, viewProjectionMatrix, currentTime);

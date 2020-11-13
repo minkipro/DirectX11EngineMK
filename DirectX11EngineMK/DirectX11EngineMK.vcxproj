@@ -111,6 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -155,6 +156,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Graphics\CharacterManager.cpp" />
+    <ClCompile Include="FileManager.cpp" />
     <ClCompile Include="Graphics\Geometry.cpp" />
     <ClCompile Include="Graphics\Camera2D.cpp" />
     <ClCompile Include="Graphics\GameObject2D.cpp" />
@@ -190,6 +193,8 @@
     <ClCompile Include="Graphics\XFileModel.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Graphics\CharacterManager.h" />
+    <ClInclude Include="FileManager.h" />
     <ClInclude Include="Graphics\Geometry.h" />
     <ClInclude Include="Graphics\Camera2D.h" />
     <ClInclude Include="Graphics\GameObject2D.h" />

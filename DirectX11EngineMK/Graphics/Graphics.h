@@ -17,10 +17,12 @@
 
 #include "Geometry.h"
 
+class FileManager;
+class CharacterManager;
 class Graphics
 {
 public:
-	bool Initialize(HWND hwnd, int width, int height);
+	bool Initialize(HWND hwnd, int width, int height, FileManager* fileManager);
 	void RenderFrame();
 	~Graphics();
 
@@ -80,7 +82,6 @@ public:
 	float _camera3DSpeed;
 	float _cameraRotSpeed;
 	Camera3D _camera3D;
-	vector<RenderableGameObject*> _gameObjects;
 	Timer _fpsTimer;
 
 	Camera2D _camera2D;
@@ -88,4 +89,6 @@ public:
 	Geometry _geometry;
 
 	float _factor = 1.0f;
+	FileManager* _fileManager;
+	CharacterManager* _characterManager;
 };

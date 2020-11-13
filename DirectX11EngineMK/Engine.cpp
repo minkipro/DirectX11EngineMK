@@ -1,4 +1,13 @@
 #include "Engine.h"
+#include "FileManager.h"
+
+Engine::~Engine()
+{
+	if (_fileManager)
+	{
+		delete _fileManager;
+	}
+}
 
 bool Engine::Initialize(HINSTANCE hInstance, string window_title, string window_class, int width, int height)
 {
@@ -6,8 +15,11 @@ bool Engine::Initialize(HINSTANCE hInstance, string window_title, string window_
 	if (!_wnd.Initialize(this, hInstance, window_title, window_class, width, height))
 		return false;
 
-	if (!_gfx.Initialize(_wnd.GetHWND(), width, height))
+	_fileManager = new FileManager;
+
+	if (!_gfx.Initialize(_wnd.GetHWND(), width, height, _fileManager))
 		return false;
+
 	return true;
 }
 

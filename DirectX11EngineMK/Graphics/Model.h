@@ -1,7 +1,6 @@
 #pragma once
 #include "Mesh.h"
 #include <unordered_map>
-#include "..//Timer.h"
 
 using namespace DirectX;
 struct BoneInfo
@@ -10,15 +9,36 @@ struct BoneInfo
 	XMMATRIX finalTransform;
 };
 
-struct testdata
+struct NodeData
 {
-	XMVECTOR scale;
-	XMVECTOR rotation;
-	XMVECTOR translation;
+	std::string name;
+	XMMATRIX transfomation;
+	std::vector<NodeData> childs;
+};
 
-	XMVECTOR postscale;
-	XMVECTOR postrotation;
-	XMVECTOR posttranslation;
+struct KeyVectorData
+{
+	float time;
+	aiVector3D vectorData;
+};
+
+struct KeyQuaterData
+{
+	float time;
+	aiQuaternion quaterData;
+};
+
+struct NodeAnimData
+{
+	vector<KeyVectorData> scalingKeys;
+	vector<KeyQuaterData> rotationKeys;
+	vector<KeyVectorData> positionKeys;
+};
+struct AnimData
+{
+	float tickPerSecond;
+	float duration;
+	unordered_map<string, NodeAnimData> nodeAnimDatas;
 };
 
 class Model
@@ -26,18 +46,27 @@ class Model
 public:
 	bool Initialize(const std::string& filePath, ID3D11Device* device, ID3D11DeviceContext* deviceContext, ConstantBuffer<CB_VS_vertexshader_skeleton>& cb_vs_vertexshader_skeleton);
 	void Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatrix, float* currentTime);
-	bool GetIsAnim() { return _isAnim; }
-private:
+	bool GetIsAnim();
 	bool LoadModel(const std::string& filePath);
-	void ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix);
-	Mesh ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix);
-	void SetAnimBoneTransform(float animationTime, const int animationIndex);
-	void ProcessNodeAnim(float tick, aiNode* node, const XMMATRIX& parentTransform);
+private:
+	void ProcessNode(const aiScene* scene, aiNode* node, const XMMATRIX& parentTransformMatrix, NodeData* data);
+	Mesh ProcessMesh(const aiScene* scene, aiMesh* mesh, const XMMATRIX& transformMatrix);
+
+	//Animation
+	void SetAnimBoneTransform(float animationTime);
+	void ProcessNodeAnim(float tick, NodeData* animData, const XMMATRIX& parentTransform);
+	void CalNodeTransformMatrix(NodeAnimData* nodeAnim, XMMATRIX& nodeTransform, float tick);
+	unsigned int FindKeyIndex(const float animationTime, vector<KeyVectorData>& vectorDatas);
+	unsigned int FindKeyIndex(const float animationTime, vector<KeyQuaterData>& quaterDatas);
+	void CalcInterpolatedValueFromKey(float animationTime, NodeAnimData* nodeAnimData, aiVector3D& scaling, aiQuaternion& rotationQ, aiVector3D& translation);
+	
+	//Texture
 	TextureStorageType DetermineTextureStorageType(const aiScene* pScene, aiMaterial* pMat, unsigned int index, aiTextureType textureType);
 	std::vector<Texture> LoadMaterialTextures(aiMaterial* pMaterial, aiTextureType textureType, const aiScene* pScene);
 	int GetTextureIndex(aiString* pStr);
-	aiNodeAnim* FindNodeAnim(const aiAnimation* animation, const string nodeName);
-	void CalNodeTransformMatrix(const aiNodeAnim* nodeAnim, XMMATRIX& nodeTransform, float tick);
+	
+	
+	
 	
 private:
 	std::vector<Mesh>					_meshes;
@@ -47,14 +76,11 @@ private:
 		= nullptr;
 	ConstantBuffer<CB_VS_vertexshader_skeleton>* _cb_vs_vertexshader_skeleton		= nullptr;
 	std::string							_directory				= "";
-	Timer _timer;
-
-	Assimp::Importer _importer;
-	const aiScene* _pScene = nullptr;
 
 	XMMATRIX _currentBone[100];
 	std::unordered_map<std::string, std::pair<int, XMMATRIX>> _boneInfo = {};
 	XMMATRIX _axisMatrix;
-
-	bool _isAnim;
+	std::vector<AnimData> _animations;
+	size_t _animIndex;
+	NodeData _rootNode;
 };

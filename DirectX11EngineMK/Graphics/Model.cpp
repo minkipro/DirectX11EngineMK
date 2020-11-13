@@ -1,96 +1,14 @@
 #include "Model.h"
 
-unsigned int FindKeyIndex(const float animationTime, const int numKeys, const aiVectorKey* const vectorKey)
-{
-	assert(numKeys > 0);
-	for (int i = 0; i < numKeys - 1; i++)
-		if (animationTime < (float)vectorKey[i + 1].mTime)
-			return i;
-	return numKeys - 1;
-}
 
-unsigned int FindKeyIndex(const float animationTime, const int numKeys, const aiQuatKey* const quatKey)
-{
-	assert(numKeys > 0);
-	for (int i = 0; i < numKeys - 1; i++)
-		if (animationTime < (float)quatKey[i + 1].mTime)
-			return i;
-	return numKeys - 1;
-}
 
-aiVector3D CalcInterpolatedValueFromKey(float animationTime, const int numKeys, const aiVectorKey* const vectorKey)
-{
-	aiVector3D ret;
-	if (numKeys == 1)
-	{
-		ret = vectorKey[0].mValue;
-		return ret;
-	}
 
-	unsigned int keyIndex = FindKeyIndex(animationTime, numKeys, vectorKey);
-	unsigned int nextKeyIndex = keyIndex + 1;
-
-	if (nextKeyIndex < numKeys)
-	{
-		float deltaTime = vectorKey[nextKeyIndex].mTime - vectorKey[keyIndex].mTime;
-		float factor = (animationTime - (float)vectorKey[keyIndex].mTime) / deltaTime;
-
-		assert(factor >= 0.0f && factor <= 1.0f);
-
-		const aiVector3D& startValue = vectorKey[keyIndex].mValue;
-		const aiVector3D& endValue = vectorKey[nextKeyIndex].mValue;
-
-		ret.x = startValue.x + (endValue.x - startValue.x) * factor;
-		ret.y = startValue.y + (endValue.y - startValue.y) * factor;
-		ret.z = startValue.z + (endValue.z - startValue.z) * factor;
-	}
-	else
-	{
-		ret = vectorKey[keyIndex].mValue;
-	}
-
-	
-
-	return ret;
-}
-
-aiQuaternion CalcInterpolatedValueFromKey(float animationTime, const int numKeys, const aiQuatKey* const quatKey)
-{
-	aiQuaternion ret;
-	if (numKeys == 1)
-	{
-		ret = quatKey[0].mValue;
-		return ret;
-	}
-
-	unsigned int keyIndex = FindKeyIndex(animationTime, numKeys, quatKey);
-	unsigned int nextKeyIndex = keyIndex + 1;
-
-	if (nextKeyIndex < numKeys)
-	{
-		float deltaTime = quatKey[nextKeyIndex].mTime - quatKey[keyIndex].mTime;
-		float factor = (animationTime - (float)quatKey[keyIndex].mTime) / deltaTime;
-
-		assert(factor >= 0.0f && factor <= 1.0f);
-
-		const aiQuaternion& startValue = quatKey[keyIndex].mValue;
-		const aiQuaternion& endValue = quatKey[nextKeyIndex].mValue;
-		aiQuaternion::Interpolate(ret, startValue, endValue, factor);
-	}
-	else
-	{
-		ret = quatKey[keyIndex].mValue;
-	}
-	ret = ret.Normalize();
-	
-
-	return ret;
-}
 bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11DeviceContext* deviceContext, ConstantBuffer<CB_VS_vertexshader_skeleton>& cb_vs_vertexshader_skeleton)
 {
 	_device = device;
 	_deviceContext = deviceContext;
 	_cb_vs_vertexshader_skeleton = &cb_vs_vertexshader_skeleton;
+	_animIndex = 0;
 	for (int i = 0; i < 100; i++)
 	{
 		_cb_vs_vertexshader_skeleton->_data.boneTransform[i] = XMMatrixIdentity();
@@ -111,9 +29,6 @@ bool Model::Initialize(const std::string& filePath, ID3D11Device* device, ID3D11
 	{
 		_currentBone[i] = XMMatrixIdentity();
 	}
-
-
-	_timer.Start();
 	return true;
 }
 
@@ -121,9 +36,9 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 {
 	if (currentTime)
 	{
-		if (_isAnim)
+		if (_animIndex <_animations.size())
 		{
-			SetAnimBoneTransform(*currentTime, 0);
+			SetAnimBoneTransform(*currentTime);
 		}
 		else
 		{
@@ -150,59 +65,100 @@ void Model::Draw(const XMMATRIX& worldMatrix, const XMMATRIX& viewProjectionMatr
 	}
 }
 
+bool Model::GetIsAnim()
+{
+	return !_animations.empty();
+}
+
 
 bool Model::LoadModel(const std::string& filePath)
 {
-
-	_directory = StringHelper::GetDirectoryFromPath(filePath);
-
-	_pScene = _importer.ReadFile(filePath,
+	Assimp::Importer importer;
+	const aiScene* scene = importer.ReadFile(filePath,
 		aiProcess_Triangulate |
 		aiProcess_ConvertToLeftHanded);
-	if (_pScene == nullptr)
+	if (scene == nullptr)
 		return false;
-
-	int upAxis,frontAxis,coordAxis = 0;
-	_axisMatrix = XMMatrixIdentity();
-	if (_pScene->mMetaData)
+	if (_meshes.empty())
 	{
-		_pScene->mMetaData->Get<int>("UpAxis", upAxis);
-		_pScene->mMetaData->Get<int>("FrontAxis", frontAxis);
-		_pScene->mMetaData->Get<int>("CoordAxis", coordAxis);
-		int upAxisSign, frontAxisSign, coordAxisSign = 1;
-		_pScene->mMetaData->Get<int>("UpAxisSign", upAxisSign);
-		_pScene->mMetaData->Get<int>("FrontAxisSign", frontAxisSign);
-		_pScene->mMetaData->Get<int>("CoordAxisSign", coordAxisSign);
-		aiVector3D upVec = upAxis == 0 ? aiVector3D(upAxisSign, 0, 0) : upAxis == 1 ? aiVector3D(0, upAxisSign, 0) : aiVector3D(0, 0, upAxisSign);
-		aiVector3D forwardVec = frontAxis == 0 ? aiVector3D(frontAxisSign, 0, 0) : frontAxis == 1 ? aiVector3D(0, frontAxisSign, 0) : aiVector3D(0, 0, frontAxisSign);
-		aiVector3D rightVec = coordAxis == 0 ? aiVector3D(coordAxisSign, 0, 0) : coordAxis == 1 ? aiVector3D(0, coordAxisSign, 0) : aiVector3D(0, 0, coordAxisSign);
-		_axisMatrix = XMMATRIX(rightVec.x, rightVec.y, rightVec.z, 0.0f,
-			upVec.x, upVec.y, upVec.z, 0.0f,
-			forwardVec.x, forwardVec.y, forwardVec.z, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f);
+		_directory = StringHelper::GetDirectoryFromPath(filePath);
+		int upAxis, frontAxis, coordAxis = 0;
+		_axisMatrix = XMMatrixIdentity();
+		if (scene->mMetaData)
+		{
+			scene->mMetaData->Get<int>("UpAxis", upAxis);
+			scene->mMetaData->Get<int>("FrontAxis", frontAxis);
+			scene->mMetaData->Get<int>("CoordAxis", coordAxis);
+			int upAxisSign, frontAxisSign, coordAxisSign = 1;
+			scene->mMetaData->Get<int>("UpAxisSign", upAxisSign);
+			scene->mMetaData->Get<int>("FrontAxisSign", frontAxisSign);
+			scene->mMetaData->Get<int>("CoordAxisSign", coordAxisSign);
+			aiVector3D upVec = upAxis == 0 ? aiVector3D(upAxisSign, 0, 0) : upAxis == 1 ? aiVector3D(0, upAxisSign, 0) : aiVector3D(0, 0, upAxisSign);
+			aiVector3D forwardVec = frontAxis == 0 ? aiVector3D(frontAxisSign, 0, 0) : frontAxis == 1 ? aiVector3D(0, frontAxisSign, 0) : aiVector3D(0, 0, frontAxisSign);
+			aiVector3D rightVec = coordAxis == 0 ? aiVector3D(coordAxisSign, 0, 0) : coordAxis == 1 ? aiVector3D(0, coordAxisSign, 0) : aiVector3D(0, 0, coordAxisSign);
+			_axisMatrix = XMMATRIX(rightVec.x, rightVec.y, rightVec.z, 0.0f,
+				upVec.x, upVec.y, upVec.z, 0.0f,
+				forwardVec.x, forwardVec.y, forwardVec.z, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f);
+		}
+		ProcessNode(scene, scene->mRootNode, _axisMatrix, &_rootNode);
 	}
-	_isAnim = _pScene->mNumAnimations != 0;
 
-	ProcessNode(_pScene->mRootNode, _axisMatrix);
+	for (unsigned int i = 0; i < scene->mNumAnimations; i++)
+	{
+		_animations.push_back(AnimData());
+		AnimData& animData = _animations.back();
+		animData.tickPerSecond = scene->mAnimations[i]->mTicksPerSecond;
+		animData.duration = scene->mAnimations[i]->mDuration;
+		for (unsigned int j = 0; j < scene->mAnimations[i]->mNumChannels; j++)
+		{
+			NodeAnimData& curNodeAnimData = animData.nodeAnimDatas[scene->mAnimations[i]->mChannels[j]->mNodeName.C_Str()];
+			for (unsigned int k = 0; k < scene->mAnimations[i]->mChannels[j]->mNumScalingKeys; k++)
+			{
+				curNodeAnimData.scalingKeys.push_back(KeyVectorData());
+				KeyVectorData& curKeyData = curNodeAnimData.scalingKeys.back();
+				curKeyData.time = scene->mAnimations[i]->mChannels[j]->mScalingKeys[k].mTime;
+				curKeyData.vectorData = scene->mAnimations[i]->mChannels[j]->mScalingKeys[k].mValue;
+			}
 
+			for (unsigned int k = 0; k < scene->mAnimations[i]->mChannels[j]->mNumRotationKeys; k++)
+			{
+				curNodeAnimData.rotationKeys.push_back(KeyQuaterData());
+				KeyQuaterData& curKeyData = curNodeAnimData.rotationKeys.back();
+				curKeyData.time = scene->mAnimations[i]->mChannels[j]->mRotationKeys[k].mTime;
+				curKeyData.quaterData = scene->mAnimations[i]->mChannels[j]->mRotationKeys[k].mValue;
+			}
+
+			for (unsigned int k = 0; k < scene->mAnimations[i]->mChannels[j]->mNumPositionKeys; k++)
+			{
+				curNodeAnimData.positionKeys.push_back(KeyVectorData());
+				KeyVectorData& curKeyData = curNodeAnimData.positionKeys.back();
+				curKeyData.time = scene->mAnimations[i]->mChannels[j]->mPositionKeys[k].mTime;
+				curKeyData.vectorData = scene->mAnimations[i]->mChannels[j]->mPositionKeys[k].mValue;
+			}
+		}
+	}
 	return true;
 }
 
-void Model::ProcessNode(aiNode* node, const XMMATRIX& parentTransformMatrix)
+void Model::ProcessNode(const aiScene* scene, aiNode* node, const XMMATRIX& parentTransformMatrix, NodeData* animData)
 {
-	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)) * parentTransformMatrix;
+	animData->name = node->mName.C_Str();
+	animData->transfomation = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
+	XMMATRIX nodeTransformMatrix = animData->transfomation * parentTransformMatrix;
 	for (UINT i = 0; i < node->mNumMeshes; i++)
 	{
-		aiMesh* mesh = _pScene->mMeshes[node->mMeshes[i]];
-		_meshes.push_back(ProcessMesh(mesh, nodeTransformMatrix));
+		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+		_meshes.push_back(ProcessMesh(scene, mesh, nodeTransformMatrix));
 	}
 	for (UINT i = 0; i < node->mNumChildren; i++)
 	{
-		ProcessNode(node->mChildren[i], nodeTransformMatrix);
+		animData->childs.push_back(NodeData());
+		ProcessNode(scene, node->mChildren[i], nodeTransformMatrix, &animData->childs.back());
 	}
 }
 
-Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
+Mesh Model::ProcessMesh(const aiScene* scene, aiMesh* mesh, const XMMATRIX& transformMatrix)
 {
 	std::vector<Vertex3D_Skeleton> vertices;
 	std::vector<DWORD> indices;
@@ -307,55 +263,176 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const XMMATRIX& transformMatrix)
 	}
 
 	std::vector<Texture> textures;
-	aiMaterial* material = _pScene->mMaterials[mesh->mMaterialIndex];
-	std::vector<Texture> diffuseTextures = LoadMaterialTextures(material, aiTextureType::aiTextureType_DIFFUSE, _pScene);
+	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+	std::vector<Texture> diffuseTextures = LoadMaterialTextures(material, aiTextureType::aiTextureType_DIFFUSE, scene);
 	textures.insert(textures.end(), diffuseTextures.begin(), diffuseTextures.end());
 	Mesh ret(_device, _deviceContext, vertices, indices, textures, transformMatrix, isTri);
 	return ret;
 }
-vector<string> nodeNames;
-void Model::SetAnimBoneTransform(float animationTime, const int animationIndex)
+
+//animation
+void Model::SetAnimBoneTransform(float animationTime)
 {
-	float tick = animationTime * 0.001f * _pScene->mAnimations[animationIndex]->mTicksPerSecond;
-	tick = fmod(tick, _pScene->mAnimations[animationIndex]->mDuration);
-	nodeNames.clear();
-	ProcessNodeAnim(tick, _pScene->mRootNode, _axisMatrix);
+	static float pretick = 0;
+	float tick = animationTime * 0.001f * _animations[_animIndex].tickPerSecond;
+	tick = fmod(tick, _animations[_animIndex].duration);
+	if (pretick > tick)
+	{
+		_animIndex++;
+		if (_animations.size() == _animIndex)
+		{
+			_animIndex = 0;
+		}
+	}
+	ProcessNodeAnim(tick, &_rootNode, _axisMatrix);
+	pretick = tick;
 }
 
-void Model::ProcessNodeAnim(float tick, aiNode* node, const XMMATRIX& parentTransform)
+void Model::ProcessNodeAnim(float tick, NodeData* animData, const XMMATRIX& parentTransform)
 {
-	string nodeName = node->mName.data;
-	const aiAnimation* animation = _pScene->mAnimations[0];
-
-	XMMATRIX nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
-	const aiNodeAnim* nodeAnim = FindNodeAnim(animation, nodeName);
-
-	CalNodeTransformMatrix(nodeAnim, nodeTransformMatrix, tick);
+	NodeAnimData nodeAnimData = _animations[_animIndex].nodeAnimDatas[animData->name];
+	
+	XMMATRIX nodeTransformMatrix = animData->transfomation;
+	CalNodeTransformMatrix(&nodeAnimData, nodeTransformMatrix, tick);
 
 	XMMATRIX globalTransform = nodeTransformMatrix * parentTransform;
 
 
-	if (_boneInfo.find(nodeName) != _boneInfo.end())
+	if (_boneInfo.find(animData->name) != _boneInfo.end())
 	{
-		vector<int> indexs;
-		for (int i = 0; i < indexs.size(); i++)
-		{
-			if (indexs[i] == _boneInfo[nodeName].first)
-			{
-				nodeTransformMatrix = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
-				globalTransform = nodeTransformMatrix * parentTransform;
-				break;
-			}
-		}
-		XMMATRIX finalTransform = _boneInfo[nodeName].second * globalTransform;
-		_currentBone[_boneInfo[nodeName].first] = finalTransform;
+		XMMATRIX finalTransform = _boneInfo[animData->name].second * globalTransform;
+		_currentBone[_boneInfo[animData->name].first] = finalTransform;
 	}
-	for (UINT i = 0; i < node->mNumChildren; i++)
+	size_t childNum = animData->childs.size();
+	for (size_t i = 0; i < childNum; i++)
 	{
-		ProcessNodeAnim(tick, node->mChildren[i], globalTransform);
+		ProcessNodeAnim(tick, &animData->childs[i], globalTransform);
 	}
 }
+void Model::CalNodeTransformMatrix(NodeAnimData* nodeAnim, XMMATRIX& nodeTransform, float tick)
+{
+	if (nodeAnim&&!nodeAnim->scalingKeys.empty() && !nodeAnim->rotationKeys.empty() && !nodeAnim->positionKeys.empty())
+	{
+		aiVector3D scaling;
+		aiQuaternion rotationQ;
+		aiVector3D translation;
+		CalcInterpolatedValueFromKey(tick, nodeAnim, scaling, rotationQ, translation);
+		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
+		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
+		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
+		nodeTransform = scalingM * rotationM * translationM;
+	}
+}
+void Model::CalcInterpolatedValueFromKey(float animationTime, NodeAnimData* nodeAnimData, aiVector3D& scaling, aiQuaternion& rotationQ, aiVector3D& translation)
+{
+	size_t numKeys = nodeAnimData->scalingKeys.size();
+	if (numKeys == 1)
+	{
+		scaling = nodeAnimData->scalingKeys[0].vectorData;
+	}
+	else
+	{
+		unsigned int keyIndex = FindKeyIndex(animationTime, nodeAnimData->scalingKeys);
+		unsigned int nextKeyIndex = keyIndex + 1;
 
+		if (nextKeyIndex < numKeys)
+		{
+			float deltaTime = nodeAnimData->scalingKeys[nextKeyIndex].time - nodeAnimData->scalingKeys[keyIndex].time;
+			float factor = (animationTime - nodeAnimData->scalingKeys[keyIndex].time) / deltaTime;
+
+			assert(factor >= 0.0f && factor <= 1.0f);
+
+			const aiVector3D& startValue = nodeAnimData->scalingKeys[keyIndex].vectorData;
+			const aiVector3D& endValue = nodeAnimData->scalingKeys[nextKeyIndex].vectorData;
+
+			scaling.x = startValue.x + (endValue.x - startValue.x) * factor;
+			scaling.y = startValue.y + (endValue.y - startValue.y) * factor;
+			scaling.z = startValue.z + (endValue.z - startValue.z) * factor;
+		}
+		else
+		{
+			assert(0);
+		}
+	}
+
+	numKeys = nodeAnimData->rotationKeys.size();
+	if (numKeys == 1)
+	{
+		rotationQ = nodeAnimData->rotationKeys[0].quaterData;
+	}
+	else
+	{
+		unsigned int keyIndex = FindKeyIndex(animationTime, nodeAnimData->rotationKeys);
+		unsigned int nextKeyIndex = keyIndex + 1;
+
+		if (nextKeyIndex < numKeys)
+		{
+			float deltaTime = nodeAnimData->rotationKeys[nextKeyIndex].time - nodeAnimData->rotationKeys[keyIndex].time;
+			float factor = (animationTime - nodeAnimData->rotationKeys[keyIndex].time) / deltaTime;
+
+			assert(factor >= 0.0f && factor <= 1.0f);
+
+			const aiQuaternion& startValue = nodeAnimData->rotationKeys[keyIndex].quaterData;
+			const aiQuaternion& endValue = nodeAnimData->rotationKeys[nextKeyIndex].quaterData;
+			aiQuaternion::Interpolate(rotationQ, startValue, endValue, factor);
+		}
+		else
+		{
+			assert(0);
+		}
+		rotationQ = rotationQ.Normalize();
+	}
+
+	numKeys = nodeAnimData->positionKeys.size();
+	if (numKeys == 1)
+	{
+		translation = nodeAnimData->positionKeys[0].vectorData;
+	}
+	else
+	{
+		unsigned int keyIndex = FindKeyIndex(animationTime, nodeAnimData->positionKeys);
+		unsigned int nextKeyIndex = keyIndex + 1;
+
+		if (nextKeyIndex < numKeys)
+		{
+			float deltaTime = nodeAnimData->positionKeys[nextKeyIndex].time - nodeAnimData->positionKeys[keyIndex].time;
+			float factor = (animationTime - nodeAnimData->positionKeys[keyIndex].time) / deltaTime;
+
+			assert(factor >= 0.0f && factor <= 1.0f);
+
+			const aiVector3D& startValue = nodeAnimData->positionKeys[keyIndex].vectorData;
+			const aiVector3D& endValue = nodeAnimData->positionKeys[nextKeyIndex].vectorData;
+
+			translation.x = startValue.x + (endValue.x - startValue.x) * factor;
+			translation.y = startValue.y + (endValue.y - startValue.y) * factor;
+			translation.z = startValue.z + (endValue.z - startValue.z) * factor;
+		}
+		else
+		{
+			assert(0);
+		}
+	}
+}
+unsigned int Model::FindKeyIndex(const float animationTime, vector<KeyVectorData>& vectorDatas)
+{
+	size_t numKeys = vectorDatas.size();
+	assert(numKeys > 0);
+	for (size_t i = 0; i < numKeys - 1; i++)
+		if (animationTime < (float)vectorDatas[i + 1].time)
+			return i;
+	return numKeys - 1;
+}
+unsigned int Model::FindKeyIndex(const float animationTime, vector<KeyQuaterData>& quaterDatas)
+{
+	size_t numKeys = quaterDatas.size();
+	assert(numKeys > 0);
+	for (size_t i = 0; i < numKeys - 1; i++)
+		if (animationTime < quaterDatas[i + 1].time)
+			return i;
+	return numKeys - 1;
+}
+
+//texture
 TextureStorageType Model::DetermineTextureStorageType(const aiScene* pScene, aiMaterial* pMat, unsigned int index, aiTextureType textureType)
 {
 	if (pMat->GetTextureCount(textureType) == 0)
@@ -474,30 +551,4 @@ int Model::GetTextureIndex(aiString* pStr)
 	return atoi(&pStr->C_Str()[1]);
 }
 
-aiNodeAnim* Model::FindNodeAnim(const aiAnimation* animation, const string nodeName)
-{
-	for (int i = 0; i < animation->mNumChannels; i++)
-		if (animation->mChannels[i]->mNodeName.data == nodeName)
-			return animation->mChannels[i];
-	return nullptr;
-}
 
-void Model::CalNodeTransformMatrix(const aiNodeAnim* nodeAnim, XMMATRIX& nodeTransform, float tick)
-{
-	
-	if (nodeAnim)
-	{
-		nodeNames.push_back(nodeAnim->mNodeName.data);
-		tick *=nodeAnim->mScalingKeys[nodeAnim->mNumScalingKeys - 1].mTime/ _pScene->mAnimations[0]->mDuration;
-		
-		const aiVector3D& scaling = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumScalingKeys, nodeAnim->mScalingKeys);
-		XMMATRIX scalingM = XMMatrixScaling(scaling.x, scaling.y, scaling.z);
-
-		const aiQuaternion& rotationQ = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumRotationKeys, nodeAnim->mRotationKeys);
-		XMMATRIX rotationM = XMMatrixRotationQuaternion({ rotationQ.x, rotationQ.y, rotationQ.z, rotationQ.w });
-
-		const aiVector3D& translation = CalcInterpolatedValueFromKey(tick, nodeAnim->mNumPositionKeys, nodeAnim->mPositionKeys);
-		XMMATRIX translationM = XMMatrixTranslation(translation.x, translation.y, translation.z);
-		nodeTransform = scalingM * rotationM * translationM;
-	}
-}

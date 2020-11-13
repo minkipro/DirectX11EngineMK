@@ -1,12 +1,16 @@
 #include "Graphics.h"
 
-bool Graphics::Initialize(HWND hwnd, int width, int height)
+#include "../FileManager.h"
+#include "CharacterManager.h"
+bool Graphics::Initialize(HWND hwnd, int width, int height, FileManager* fileManager)
 {
 	_windowWidth = width;
 	_windowHeight = height;
 	_camera3DSpeed = 0.1f;
 	_cameraRotSpeed = 0.01f;
 	_fpsTimer.Start();
+	_fileManager = _fileManager;
+	_characterManager = new CharacterManager;
 	if (!InitializeDirectX(hwnd))
 		return false;
 	if (!InitializeShaders())
@@ -20,10 +24,7 @@ bool Graphics::Initialize(HWND hwnd, int width, int height)
 
 void Graphics::RenderFrame()
 {
-	XMMATRIX viewMatrix = _camera3D.GetViewMatrix();
-	XMMATRIX projectionMatrix = _camera3D.GetProjectionMatrix();
-	XMMATRIX viewProj = viewMatrix * projectionMatrix;
-
+	XMMATRIX viewProj = _camera3D.GetViewMatrix() * _camera3D.GetProjectionMatrix();
 	float bgcolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	_deviceContext->ClearRenderTargetView(_renderTargetView.Get(), bgcolor);
 	_deviceContext->ClearDepthStencilView(_depthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -39,17 +40,7 @@ void Graphics::RenderFrame()
 	_deviceContext->PSSetShader(_pixelShader_nolight.GetShader(), NULL, 0);
 	_deviceContext->IASetInputLayout(_vertexShader_skeleton.GetInputLayout());
 	float currentTime = _fpsTimer.GetMilisecondsElapsed();
-	for (size_t i = 0; i < _gameObjects.size(); i++)
-	{
-		if (_gameObjects[i]->GetIsAnim())
-		{
-			_gameObjects[i]->Draw(viewProj, &currentTime);
-		}
-		else
-		{
-			_gameObjects[i]->Draw(viewProj, nullptr);
-		}
-	}
+	_characterManager->Draw(viewProj, &currentTime);
 
 	_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST);
 	_deviceContext->VSSetShader(_vertexShader_color.GetShader(), NULL, 0);
@@ -118,12 +109,10 @@ void Graphics::RenderFrame()
 
 Graphics::~Graphics()
 {
-	for (size_t i = 0; i < _gameObjects.size(); i++)
+	if (_characterManager)
 	{
-		if (_gameObjects[i]);
-		{
-			delete _gameObjects[i];
-		}
+		delete _characterManager;
+		_characterManager = nullptr;
 	}
 }
 
@@ -336,21 +325,8 @@ bool Graphics::InitializeScene()
 {
 	try
 	{
-		//Load Texture
-		HRESULT hr = CreateWICTextureFromFile(_device.Get(), L"Data\\Textures\\seamless_grass.jpg", nullptr, _grassTexture.GetAddressOf());
-		COM_ERROR_IF_FAILED(hr, "Failed to create wic texture from file.");
-
-		hr = CreateWICTextureFromFile(_device.Get(), L"Data\\Textures\\pinksquare.jpg", nullptr, _pinkTexture.GetAddressOf());
-		COM_ERROR_IF_FAILED(hr, "Failed to create wic texture from file.");
-
-		hr = CreateWICTextureFromFile(_device.Get(), L"Data\\Textures\\seamless_pavement.jpg", nullptr, _pavementTexture.GetAddressOf());
-		COM_ERROR_IF_FAILED(hr, "Failed to create wic texture from file.");
-
-		hr = CreateWICTextureFromFile(_device.Get(), L"Data\\Textures\\piano.PNG", nullptr, _pianoTexture.GetAddressOf());
-		COM_ERROR_IF_FAILED(hr, "Failed to create wic texture from file.");
-		
 		//Initialize Constant Buffer
-		hr = _cb_vs_vertexshader_2d.Initialize(_device.Get(), _deviceContext.Get());
+		HRESULT hr = _cb_vs_vertexshader_2d.Initialize(_device.Get(), _deviceContext.Get());
 		COM_ERROR_IF_FAILED(hr, "Failed to initialize constant buffer.");
 
 		hr = _cb_vs_vertexshader.Initialize(_device.Get(), _deviceContext.Get());
@@ -364,40 +340,8 @@ bool Graphics::InitializeScene()
 
 		//Initialize Model(s)
 
-		for (int i = 0; i < 1; i++)
-		{
-			_gameObjects.push_back(new RenderableGameObject);
-		}
+		_characterManager->Initialize(_fileManager, _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton);
 
-		/*if (!_gameObjects[0]->Initialize("Data\\Objects\\Nanosuit\\rp_nathan_animated_003_walking.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
-		{
-			return false;
-		}*/
-
-		/*if (!_gameObjects[1]->Initialize("Data\\Objects\\Nanosuit\\rp_sophia_animated_003_idling.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
-		{
-			return false;
-		}*/
-		if (!_gameObjects[0]->Initialize("Data\\Objects\\characters\\garen_2013_attack_01.fbx", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
-		{
-			return false;
-		}
-	
-		//_gameObjects[0]->SetPosition(100, 0, 0);
-
-
-		/*if (!_gameObjects[2]->Initialize("Data\\Objects\\scifi tropical city\\Sci-fi Tropical city.obj", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton))
-		{
-			return false;
-		}*/
-
-
-		
-
-		if (!_sprite.Initialize(_device.Get(), _deviceContext.Get(), 256, 256, "Data/Textures/circle.png", _cb_vs_vertexshader_2d))
-			return false;
-
-		_sprite.SetPosition(XMFLOAT3(_windowWidth / 2 - _sprite.GetWidth() / 2, _windowHeight / 2 - _sprite.GetHeight(), 0.0f));
 		_camera2D.SetProjectionValues(_windowWidth, _windowHeight, 0.0f, 1.0f);
 
 		_camera3D.SetPosition(0.0f, 0.0f, -2.0f);
