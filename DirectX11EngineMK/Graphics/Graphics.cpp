@@ -35,6 +35,7 @@ void Graphics::RenderFrame()
 	_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	
 	_deviceContext->RSSetState(_rasterizerState.Get());
+	_deviceContext->OMSetBlendState(_blendState.Get(), NULL, 0xFFFFFFFF);
 	_deviceContext->PSSetSamplers(0, 1, _samplerState.GetAddressOf());
 
 	_deviceContext->VSSetShader(_vertexShader_skeleton.GetShader(), NULL, 0);
@@ -205,7 +206,7 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		_deviceContext->RSSetViewports(1, &viewport);
 		//Create Rasterizer State
 		CD3D11_RASTERIZER_DESC rasterizerDesc(D3D11_DEFAULT);
-		rasterizerDesc.CullMode = D3D11_CULL_FRONT;
+		rasterizerDesc.CullMode = D3D11_CULL_NONE;
 		hr = _device->CreateRasterizerState(&rasterizerDesc, _rasterizerState.GetAddressOf());
 		COM_ERROR_IF_FAILED(hr, "Failed to create rasterizer state.");
 
@@ -215,8 +216,8 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		D3D11_RENDER_TARGET_BLEND_DESC rtbd = { 0 };
 
 		rtbd.BlendEnable = true;
-		rtbd.SrcBlend = D3D11_BLEND::D3D11_BLEND_ONE;
-		rtbd.DestBlend = D3D11_BLEND::D3D11_BLEND_ZERO;
+		rtbd.SrcBlend = D3D11_BLEND::D3D11_BLEND_SRC_ALPHA;
+		rtbd.DestBlend = D3D11_BLEND::D3D11_BLEND_INV_SRC_ALPHA;
 		rtbd.BlendOp = D3D11_BLEND_OP::D3D11_BLEND_OP_ADD;
 		rtbd.SrcBlendAlpha = D3D11_BLEND::D3D11_BLEND_ONE;
 		rtbd.DestBlendAlpha = D3D11_BLEND::D3D11_BLEND_ZERO;
