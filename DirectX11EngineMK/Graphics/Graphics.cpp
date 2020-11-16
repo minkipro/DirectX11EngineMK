@@ -2,6 +2,7 @@
 
 #include "../FileManager.h"
 #include "CharacterManager.h"
+#include "RenderableGameObject.h"
 bool Graphics::Initialize(HWND hwnd, int width, int height, FileManager* fileManager)
 {
 	_windowWidth = width;
@@ -40,15 +41,19 @@ void Graphics::RenderFrame()
 	_deviceContext->PSSetShader(_pixelShader_nolight.GetShader(), NULL, 0);
 	_deviceContext->IASetInputLayout(_vertexShader_skeleton.GetInputLayout());
 	float currentTime = _fpsTimer.GetMilisecondsElapsed();
-	_characterManager->Draw(viewProj, &currentTime);
-
+	//_characterManager->Draw(viewProj, &currentTime);
+	if (_map)
+	{
+		_map->Draw(viewProj, nullptr);
+	}
+	
 	_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST);
 	_deviceContext->VSSetShader(_vertexShader_color.GetShader(), NULL, 0);
 	_deviceContext->PSSetShader(_pixelShader_color.GetShader(), NULL, 0);
 	_deviceContext->IASetInputLayout(_vertexShader_color.GetInputLayout());
 	
 	{
-		_geometry.Draw(viewProj,_camera3D.GetPositionVector());
+		//_geometry.Draw(viewProj,_camera3D.GetPositionVector());
 	}
 
 	
@@ -113,6 +118,12 @@ Graphics::~Graphics()
 	{
 		delete _characterManager;
 		_characterManager = nullptr;
+	}
+
+	if (_map)
+	{
+		delete _map;
+		_map = nullptr;
 	}
 }
 
@@ -194,6 +205,7 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		_deviceContext->RSSetViewports(1, &viewport);
 		//Create Rasterizer State
 		CD3D11_RASTERIZER_DESC rasterizerDesc(D3D11_DEFAULT);
+		rasterizerDesc.CullMode = D3D11_CULL_FRONT;
 		hr = _device->CreateRasterizerState(&rasterizerDesc, _rasterizerState.GetAddressOf());
 		COM_ERROR_IF_FAILED(hr, "Failed to create rasterizer state.");
 
@@ -203,8 +215,8 @@ bool Graphics::InitializeDirectX(HWND hwnd)
 		D3D11_RENDER_TARGET_BLEND_DESC rtbd = { 0 };
 
 		rtbd.BlendEnable = true;
-		rtbd.SrcBlend = D3D11_BLEND::D3D11_BLEND_SRC_ALPHA;
-		rtbd.DestBlend = D3D11_BLEND::D3D11_BLEND_INV_SRC_ALPHA;
+		rtbd.SrcBlend = D3D11_BLEND::D3D11_BLEND_ONE;
+		rtbd.DestBlend = D3D11_BLEND::D3D11_BLEND_ZERO;
 		rtbd.BlendOp = D3D11_BLEND_OP::D3D11_BLEND_OP_ADD;
 		rtbd.SrcBlendAlpha = D3D11_BLEND::D3D11_BLEND_ONE;
 		rtbd.DestBlendAlpha = D3D11_BLEND::D3D11_BLEND_ZERO;
@@ -344,10 +356,15 @@ bool Graphics::InitializeScene()
 
 		_camera2D.SetProjectionValues(_windowWidth, _windowHeight, 0.0f, 1.0f);
 
-		_camera3D.SetPosition(0.0f, 0.0f, -2.0f);
+		_camera3D.SetPosition(30.0f, 2000.0f, -60.0f);
+		_camera3D.SetLookAtPos(XMFLOAT3(0.0f, 0.0f, 0.0f));
 		_camera3D.SetProjectionValues(90.0f, static_cast<float>(_windowWidth) / static_cast<float>(_windowHeight), 0.1f, 3000.0f);
 
 		_geometry.Initialize(_device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_color);
+
+		_map = new RenderableGameObject;
+		_map->Initialize("Data\\Objects\\map\\summoner_rift.obj", _device.Get(), _deviceContext.Get(), _cb_vs_vertexshader_skeleton);
+		_map->SetScale(100.0f, 100.0f, 100.0f);
 	}
 	catch (COMException& exception)
 	{

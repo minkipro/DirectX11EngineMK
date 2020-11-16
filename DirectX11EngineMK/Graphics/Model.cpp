@@ -77,6 +77,9 @@ bool Model::LoadModel(const std::string& filePath)
 	const aiScene* scene = importer.ReadFile(filePath,
 		aiProcess_Triangulate |
 		aiProcess_ConvertToLeftHanded);
+	/*const aiScene* scene = importer.ReadFile(filePath,
+		aiProcess_Triangulate |
+		aiProcess_ConvertToLeftHanded);*/
 	if (scene == nullptr)
 		return false;
 	if (_meshes.empty())
@@ -108,6 +111,7 @@ bool Model::LoadModel(const std::string& filePath)
 	{
 		_animations.push_back(AnimData());
 		AnimData& animData = _animations.back();
+		animData.filePath = filePath;
 		animData.tickPerSecond = scene->mAnimations[i]->mTicksPerSecond;
 		animData.duration = scene->mAnimations[i]->mDuration;
 		for (unsigned int j = 0; j < scene->mAnimations[i]->mNumChannels; j++)
@@ -138,6 +142,7 @@ bool Model::LoadModel(const std::string& filePath)
 			}
 		}
 	}
+	importer.FreeScene();
 	return true;
 }
 

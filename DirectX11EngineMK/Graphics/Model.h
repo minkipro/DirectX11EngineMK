@@ -36,6 +36,7 @@ struct NodeAnimData
 };
 struct AnimData
 {
+	string filePath;
 	float tickPerSecond;
 	float duration;
 	unordered_map<string, NodeAnimData> nodeAnimDatas;

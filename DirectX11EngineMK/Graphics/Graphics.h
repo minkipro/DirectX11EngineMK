@@ -10,7 +10,6 @@
 #include "ImGUI\\imgui.h"
 #include "ImGUI\\imgui_impl_win32.h"
 #include "ImGUI\\imgui_impl_dx11.h"
-#include "RenderableGameObject.h"
 
 #include "Camera2D.h"
 #include "Sprite.h"
@@ -19,6 +18,7 @@
 
 class FileManager;
 class CharacterManager;
+class RenderableGameObject;
 class Graphics
 {
 public:
@@ -70,11 +70,6 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11SamplerState>		 _samplerState;
 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _pinkTexture;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _grassTexture;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _pavementTexture;
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _pianoTexture;
-
 	int _windowWidth = 0;
 	int _windowHeight = 0;
 
@@ -91,4 +86,5 @@ public:
 	float _factor = 1.0f;
 	FileManager* _fileManager;
 	CharacterManager* _characterManager;
+	RenderableGameObject* _map;
 };
